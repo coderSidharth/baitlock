@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 300px;
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 16px;
+      margin: 0;
+      color: #333;
+    }
+    .header {
+      border-bottom: 1px solid #eee;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      color: white;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .tier-low { background-color: #2e7d32; }
+    .tier-medium { background-color: #ed6c02; }
+    .tier-high { background-color: #d32f2f; }
+    .reasons {
+      margin-top: 12px;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+    .reasons li {
+      margin-bottom: 6px;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="content">
+    <div class="header">
+      <span id="tier-badge" class="badge">Loading...</span>
+      <h3 id="verdict-text" style="margin: 4px 0 0 0;"></h3>
+    </div>
+    <div id="score-container" style="font-size: 18px; font-weight: 500;">
+      Score: <strong id="score">--</strong>/100
+    </div>
+    <div>
+      <h4 style="margin: 12px 0 4px 0;">Reasons detected:</h4>
+      <ul id="reasons-list" class="reasons">
+      </ul>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

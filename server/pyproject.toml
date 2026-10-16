@@ -1,0 +1,30 @@
+[project]
+name = "baitlock-server"
+version = "1.0.0"
+description = "Baitlock — Real-time phishing and fraud detection backend"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.18.5",
+    "fastapi[standard]>=0.141.1",
+    "uvicorn>=0.52.0",
+    # Database
+    "sqlalchemy[asyncio]>=2.0.0",
+    "aiosqlite>=0.21.0",
+    # Config
+    "pydantic-settings>=2.0.0",
+    # AI dependencies
+    "google-genai>=2.16.0",
+    "jellyfish>=1.2.1",
+    "numpy>=2.5.1",
+    "scikit-learn>=1.9.0",
+    "pandas>=3.0.5",
+    "python-dotenv>=1.2.2",
+    "requests>=2.34.2",
+    # Auth (from teammate)
+    "pyjwt>=2.13.0",
+    "passlib[bcrypt]>=1.7.4",
+    "google-auth>=2.56.2",
+    "bcrypt>=5.0.0",
+    "python-multipart>=0.0.32",
+]
