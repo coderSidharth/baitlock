@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { LayoutDashboard, ShieldHalf, Activity, BookOpen, LogOut, PanelLeftClose, PanelLeftOpen, User } from "lucide-react";
+import { API_V1_URL } from "@/lib/api";
 
 const navItems = [
     { href: "/dashboard", icon: <LayoutDashboard />, label: "Dashboard" },
@@ -30,7 +31,7 @@ export default function Sidebar() {
         const token = localStorage.getItem('access_token');
         if (token) {
             try {
-                await fetch('http://localhost:8000/api/v1/auth/logout', {
+                await fetch(`${API_V1_URL}/auth/logout`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });

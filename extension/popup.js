@@ -61,9 +61,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 currentUrlEl.textContent = activeUrl;
 
-                // Load background scan result
-                chrome.storage.local.get(['latest_scan', 'latest_url'], (res) => {
-                    if (res.latest_url === activeUrl && res.latest_scan) {
+                // Load background scan result for current tab
+                chrome.storage.local.get(['scan_results', 'latest_scan', 'latest_url'], (res) => {
+                    const tabResult = res.scan_results && currentTab && res.scan_results[currentTab.id];
+                    if (tabResult && tabResult.url === activeUrl && tabResult.data) {
+                        renderResult(tabResult.data);
+                        flagStatus.classList.add('hidden');
+                        flagLegitBtn.disabled = false;
+                        flagMaliciousBtn.disabled = false;
+                    } else if (res.latest_url === activeUrl && res.latest_scan) {
                         renderResult(res.latest_scan);
                         flagStatus.classList.add('hidden');
                         flagLegitBtn.disabled = false;
@@ -273,6 +279,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 body: JSON.stringify(payload)
             });
             if (res.ok) {
+                // Record community reputation flag
+                fetch(`${API_BASE}/companies/flag`, {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        url: currentDomain,
+                        flag_type: flagType === 'whitelist' ? 'legitimate' : 'malicious'
+                    })
+                }).catch(() => {});
+
                 flagStatus.textContent = flagType === 'whitelist' 
                     ? "Added to your personal whitelist!" 
                     : "Thank you! Flag recorded.";

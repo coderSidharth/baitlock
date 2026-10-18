@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Circle, ShieldAlert, CheckCircle, AlertTriangle, Clock } from "lucide-react";
+import { API_V1_URL } from "@/lib/api";
 
 export default function LiveFeedPage() {
     const [events, setEvents] = useState<any[]>([]);
@@ -10,13 +11,12 @@ export default function LiveFeedPage() {
         const pulseInterval = setInterval(() => setPulse((p) => !p), 1000);
         
         const fetchEvents = () => {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
             const token = localStorage.getItem('access_token');
             const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
-            fetch(`${apiUrl}/api/v1/events?limit=50`, { headers })
-                .then(res => res.json())
+            fetch(`${API_V1_URL}/events?limit=50`, { headers })
+                .then(res => res.ok ? res.json() : null)
                 .then(data => {
-                    if (data.events) {
+                    if (data?.events) {
                         const formattedEvents = data.events.map((e: any) => {
                             const date = new Date(e.created_at);
                             const time = date.toLocaleTimeString('en-US', { hour12: false });
@@ -37,11 +37,11 @@ export default function LiveFeedPage() {
                         setEvents(formattedEvents);
                     }
                 })
-                .catch(console.error);
+                .catch(err => console.warn("Live feed fetch warning:", err?.message || err));
         };
 
         fetchEvents();
-        const pollInterval = setInterval(fetchEvents, 3000);
+        const pollInterval = setInterval(fetchEvents, 10000);
 
         return () => {
             clearInterval(pulseInterval);

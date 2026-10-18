@@ -1,10 +1,10 @@
 "use client";
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ShieldAlert, AlertTriangle, ArrowLeft } from 'lucide-react';
 
-export default function Home() {
+function HomeContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const searchParams = useSearchParams();
   const isBlocked = searchParams.get('blocked') === 'true';
@@ -38,8 +38,9 @@ export default function Home() {
 
             <div className="flex gap-4">
               <div className="flex-1 bg-white/5 rounded-xl p-4 border border-white/5">
-                <div className="text-[11px] text-zinc-500 uppercase tracking-widest font-semibold mb-1">Threat Score</div>
+                <div className="text-[11px] text-zinc-500 uppercase tracking-widest font-semibold mb-1">Safety Score</div>
                 <div className="text-2xl font-semibold text-red-400">{score} <span className="text-sm text-zinc-600 font-medium">/ 100</span></div>
+                <div className="text-[10px] text-zinc-500 font-mono mt-0.5">Threat Level: {100 - Math.min(100, Math.max(0, parseInt(score) || 0))}%</div>
               </div>
               <div className="flex-1 bg-white/5 rounded-xl p-4 border border-white/5">
                 <div className="text-[11px] text-zinc-500 uppercase tracking-widest font-semibold mb-1">Risk Tier</div>
@@ -111,5 +112,13 @@ export default function Home() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="flex w-full min-h-screen bg-[#09090b]" />}>
+      <HomeContent />
+    </Suspense>
   );
 }

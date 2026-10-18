@@ -7,5 +7,5 @@ class CompanyFlag(Base):
     id = Column(Integer, primary_key=True, index=True)
     domain = Column(String, index=True, nullable=False)
     flag_type = Column(String, nullable=False) # 'malicious' or 'legitimate'
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)

@@ -2,8 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+import { API_V1_URL } from '@/lib/api';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -24,7 +23,7 @@ export default function LoginPage() {
         try {
             if (isRegister) {
                 // Register
-                const res = await fetch(`${API_BASE}/auth/register`, {
+                const res = await fetch(`${API_V1_URL}/auth/register`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password, full_name: fullName || undefined })
@@ -52,7 +51,7 @@ export default function LoginPage() {
                 formData.append('username', email);
                 formData.append('password', password);
 
-                const loginRes = await fetch(`${API_BASE}/auth/login`, {
+                const loginRes = await fetch(`${API_V1_URL}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: formData.toString()
@@ -75,7 +74,7 @@ export default function LoginPage() {
                 formData.append('username', email);
                 formData.append('password', password);
 
-                const res = await fetch(`${API_BASE}/auth/login`, {
+                const res = await fetch(`${API_V1_URL}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: formData.toString()

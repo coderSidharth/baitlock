@@ -5,7 +5,7 @@ from datetime import datetime
 class FraudEvent(Base):
     __tablename__ = "fraud_events"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     amount = Column(Float)
     velocity = Column(Integer)
     hour = Column(Integer)
@@ -13,4 +13,4 @@ class FraudEvent(Base):
     final_score = Column(Float)
     verdict = Column(String)
     reasons_jsonb = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

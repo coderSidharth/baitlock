@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List
 
 class ChatMessageBase(BaseModel):
-    role: str
+    role: str = "user"
     content: str
 
 class ChatMessageCreate(ChatMessageBase):

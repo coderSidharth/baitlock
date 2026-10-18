@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Ban, ShieldAlert, CheckCircle, Trash2 } from "lucide-react";
+import { API_V1_URL } from "@/lib/api";
 
 export default function OverridesPage() {
     const [activeTab, setActiveTab] = useState<'blocklist' | 'whitelist'>('blocklist');
@@ -12,9 +13,9 @@ export default function OverridesPage() {
         const token = localStorage.getItem('access_token');
         const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
         Promise.all([
-            fetch("http://localhost:8000/api/v1/events?limit=50", { headers }).then(r => r.json()),
-            fetch("http://localhost:8000/api/v1/phishing/blocklist", { headers }).then(r => r.json()),
-            fetch("http://localhost:8000/api/v1/phishing/whitelist", { headers }).then(r => r.json())
+            fetch(`${API_V1_URL}/events?limit=50`, { headers }).then(r => r.ok ? r.json() : { events: [] }).catch(() => ({ events: [] })),
+            fetch(`${API_V1_URL}/phishing/blocklist`, { headers }).then(r => r.ok ? r.json() : { blocklist: [] }).catch(() => ({ blocklist: [] })),
+            fetch(`${API_V1_URL}/phishing/whitelist`, { headers }).then(r => r.ok ? r.json() : { whitelist: [] }).catch(() => ({ whitelist: [] }))
         ])
         .then(([eventsData, blocklistData, whitelistData]) => {
             const blocked = (eventsData.events || []).filter((e: any) => e.tier === "high" || e.tier === "critical");
@@ -43,7 +44,7 @@ export default function OverridesPage() {
             setLoading(false);
         })
         .catch(err => {
-            console.error(err);
+            console.warn("Overrides load warning:", err?.message || err);
             setLoading(false);
         });
     }, []);
@@ -92,7 +93,7 @@ export default function OverridesPage() {
                                                   className="text-xs font-medium px-3 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/30 rounded-full transition-colors flex items-center gap-1"
                                                   onClick={(e) => {
                                                       e.stopPropagation();
-                                                      fetch(`http://localhost:8000/api/v1/phishing/blocklist`, {
+                                                      fetch(`${API_V1_URL}/phishing/blocklist`, {
                                                         method: 'DELETE',
                                                         headers: { 
                                                           'Content-Type': 'application/json',
@@ -113,7 +114,7 @@ export default function OverridesPage() {
                                                 className="text-xs font-medium px-3 py-1 bg-green-500/20 hover:bg-green-500/40 text-green-400 border border-green-500/30 rounded-full transition-colors flex items-center gap-1"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    fetch(`http://localhost:8000/api/v1/phishing/whitelist`, {
+                                                    fetch(`${API_V1_URL}/phishing/whitelist`, {
                                                       method: 'POST',
                                                       headers: { 
                                                         'Content-Type': 'application/json',
@@ -162,7 +163,7 @@ export default function OverridesPage() {
                                               className="text-xs font-medium px-3 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/30 rounded-full transition-colors flex items-center gap-1"
                                               onClick={(e) => {
                                                   e.stopPropagation();
-                                                  fetch(`http://localhost:8000/api/v1/phishing/whitelist`, {
+                                                  fetch(`${API_V1_URL}/phishing/whitelist`, {
                                                     method: 'DELETE',
                                                     headers: { 
                                                       'Content-Type': 'application/json',

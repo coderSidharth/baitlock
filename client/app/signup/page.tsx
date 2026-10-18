@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { API_V1_URL } from '@/lib/api';
 
 export default function SignupPage() {
     const router = useRouter();
@@ -15,8 +16,7 @@ export default function SignupPage() {
         setError("");
         setLoading(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-            const res = await fetch(`${apiUrl}/api/v1/auth/register`, {
+            const res = await fetch(`${API_V1_URL}/auth/register`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ full_name: fullName, email, password }),
@@ -30,7 +30,7 @@ export default function SignupPage() {
             }
 
             // Auto-login after register
-            const loginRes = await fetch(`${apiUrl}/api/v1/auth/login`, {
+            const loginRes = await fetch(`${API_V1_URL}/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password }),
@@ -40,6 +40,7 @@ export default function SignupPage() {
             if (loginRes.ok && loginData.access_token) {
                 localStorage.setItem('access_token', loginData.access_token);
                 localStorage.setItem('isLoggedIn', 'true');
+                window.postMessage({ type: 'BAITLOCK_LOGIN', token: loginData.access_token }, '*');
                 router.push('/dashboard');
             } else {
                 router.push('/login');

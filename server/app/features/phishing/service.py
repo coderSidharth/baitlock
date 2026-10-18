@@ -14,24 +14,48 @@ def strip_tags(html: str) -> str:
     text = re.sub(r'<[^>]+>', ' ', html)
     return ' '.join(text.split())
 
+import ipaddress
+import socket
+
+def _is_safe_url(url: str) -> bool:
+    """Reject URLs that would cause SSRF (internal IPs, non-http schemes, metadata endpoints)."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        # Resolve the hostname and check if it's a private/reserved IP
+        resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for _, _, _, _, sockaddr in resolved:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_reserved or ip.is_loopback or ip.is_link_local:
+                return False
+        return True
+    except Exception:
+        return False
+
 def fetch_page_content(url: str) -> str:
+    if not _is_safe_url(url):
+        return ""
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, headers=headers, timeout=5)
+        res = requests.get(url, headers=headers, timeout=5, allow_redirects=False)
         res.raise_for_status()
         return strip_tags(res.text)[:3000]
     except Exception as e:
         print(f"Failed to fetch {url}: {e}")
         return ""
 
+
 def score_phishing_service(db: Session, url: str, text_content: str = None, user_id: int = None, fast_mode: bool = False) -> dict:
+    domain = (urlparse(url).hostname or urlparse(url).netloc or url).lower().split(':')[0].replace("www.", "")
     if user_id:
-        domain = urlparse(url).hostname or urlparse(url).netloc or url
-        
         # Check BLOCKLIST first (takes priority over everything)
         blocklist_entry = db.query(UserBlocklist).filter(
             UserBlocklist.user_id == user_id,
-            UserBlocklist.domain.like(f"%{domain}%")
+            UserBlocklist.domain == domain
         ).first()
         
         if blocklist_entry:
@@ -48,7 +72,7 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
         # Then check whitelist
         whitelist_entry = db.query(UserWhitelist).filter(
             UserWhitelist.user_id == user_id, 
-            UserWhitelist.domain.like(f"%{domain}%")
+            UserWhitelist.domain == domain
         ).first()
         
         if whitelist_entry:
@@ -64,10 +88,13 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
             
     # Check Cache only for fast background scans
     if fast_mode:
-        cached_event = db.query(PhishingEvent).filter(
+        cache_query = db.query(PhishingEvent).filter(
             PhishingEvent.input_url == url,
             PhishingEvent.created_at >= datetime.utcnow() - timedelta(hours=12)
-        ).order_by(PhishingEvent.created_at.desc()).first()
+        )
+        if user_id:
+            cache_query = cache_query.filter(PhishingEvent.user_id == user_id)
+        cached_event = cache_query.order_by(PhishingEvent.created_at.desc()).first()
     
         if cached_event:
             reasons = []
@@ -80,7 +107,7 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
             # Determine tier from verdict if possible, otherwise safe
             tier = "safe"
             v = cached_event.verdict.lower()
-            if "critical" in v: tier = "critical"
+            if "critical" in v or "blocked" in v: tier = "critical"
             elif "high" in v or "review" in v: tier = "high"
             elif "moderate" in v: tier = "moderate"
             
@@ -97,19 +124,24 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
     rule_res = rule_check_phishing(url)
     ml_res = predict_phishing_ml(url)
     
-    if not text_content:
+    # In fast_mode, never scrape external network to ensure zero navigation latency and eliminate SSRF
+    if not text_content and not fast_mode:
         fetched = fetch_page_content(url)
         if fetched:
             text_content = fetched
 
     llm_res = {"llm_score": 0, "llm_reasons": []}
     
-    # Calculate base score from Rule and ML engines first
+    # Calculate base score from Rule and ML engines
     base_weighted = (rule_res["rule_score"] * 0.4) + (ml_res["ml_score"] * 0.6)
     base_min = min(rule_res["rule_score"], ml_res["ml_score"])
     
-    # Use min to heavily penalize if either engine is confident it's phishing
-    base_score = int(min(base_weighted, base_min))
+    # If either engine is very confident it's phishing (< 30), use the min to penalize hard.
+    # Otherwise use the weighted average so both engines contribute proportionally.
+    if base_min < 30:
+        base_score = int(base_min)
+    else:
+        base_score = int(base_weighted)
 
     # Early Exit Strategy: Avoid slow LLM if the site is decisively malicious or very safe, OR if fast_mode is True
     if not fast_mode and text_content and 40 <= base_score <= 85:
@@ -130,8 +162,22 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
     raw_reasons = rule_res["rule_reasons"] + ml_res["ml_reasons"] + llm_res.get("llm_reasons", [])
     all_reasons = [r for r in raw_reasons if "Ollama local API error" not in r]
     
+    # Check community flags from CompanyFlag
+    from app.features.companies.models import CompanyFlag
+    community_flags = db.query(CompanyFlag).filter(CompanyFlag.domain == domain).all()
+    if community_flags:
+        malicious_count = sum(1 for f in community_flags if f.flag_type == "malicious")
+        legit_count = sum(1 for f in community_flags if f.flag_type == "legitimate")
+        if malicious_count > legit_count and malicious_count >= 1:
+            penalty = min(35, malicious_count * 15)
+            final_score = max(0, final_score - penalty)
+            all_reasons.append(f"Flagged by community as suspicious ({malicious_count} report{'s' if malicious_count > 1 else ''})")
+        elif legit_count > malicious_count and final_score < 80:
+            final_score = min(100, final_score + 15)
+            all_reasons.append("Flagged by community as legitimate domain")
+
     TRUSTED_DOMAINS = {"google.com", "github.com", "microsoft.com", "apple.com", "amazon.com", "netflix.com", "facebook.com", "youtube.com"}
-    domain_base = (urlparse(url).hostname or "").lower()
+    domain_base = domain
     
     is_trusted = False
     for td in TRUSTED_DOMAINS:

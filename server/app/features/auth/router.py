@@ -83,6 +83,34 @@ async def login(request: Request, db: Session = Depends(deps.get_db)):
 def read_users_me(current_user: models.User = Depends(deps.get_current_user)):
     return current_user
 
+@router.put("/me", response_model=schemas.UserOut)
+def update_user_me(
+    user_in: schemas.UserUpdate,
+    current_user: models.User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    if user_in.email and user_in.email != current_user.email:
+        existing = db.query(models.User).filter(models.User.email == user_in.email).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User with this email already exists"
+            )
+        current_user.email = user_in.email
+    if user_in.full_name is not None:
+        current_user.full_name = user_in.full_name
+    if user_in.password:
+        if user_in.current_password:
+            if not verify_password(user_in.current_password, current_user.hashed_password):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Incorrect current password"
+                )
+        current_user.hashed_password = get_password_hash(user_in.password)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user_me(current_user: models.User = Depends(deps.get_current_user), db: Session = Depends(deps.get_db)):
     db.delete(current_user)

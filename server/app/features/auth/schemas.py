@@ -9,6 +9,12 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, description="Password must be at least 8 characters long")
 
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = Field(None, min_length=8, description="Password must be at least 8 characters long")
+    current_password: Optional[str] = None
+
 class UserOut(UserBase):
     id: int
     created_at: datetime

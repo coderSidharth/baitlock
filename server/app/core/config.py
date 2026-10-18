@@ -1,4 +1,5 @@
 import os
+import secrets
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -11,8 +12,8 @@ class Settings(BaseSettings):
     OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 
-    # JWT Config
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "super-secret-key-for-development-only")
+    # JWT Config — generate a random key at startup if SECRET_KEY is not set in .env
+    SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(64))
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 1 week
 

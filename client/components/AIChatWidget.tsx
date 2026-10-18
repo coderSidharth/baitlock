@@ -1,6 +1,8 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, Send, X, ShieldAlert } from "lucide-react";
+import { MessageSquare, Send, X, ShieldAlert, RotateCcw } from "lucide-react";
+import MarkdownMessage from "./MarkdownMessage";
+import { API_V1_URL } from "@/lib/api";
 
 export default function AIChatWidget() {
     const [isOpen, setIsOpen] = useState(false);
@@ -12,12 +14,25 @@ export default function AIChatWidget() {
     const [historyLoaded, setHistoryLoaded] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
+    const sanitizeContent = (text: string) => {
+        if (!text) return text;
+        if (
+            text.includes("Groq API error") || 
+            text.includes("Ollama local API error") || 
+            text.includes("429 Client Error") ||
+            text.includes("Too Many Requests") ||
+            text.includes("LLM_PROVIDER")
+        ) {
+            return "⏳ *Baitlock AI was momentarily busy. Ready for your next inquiry.*";
+        }
+        return text;
+    };
+
     useEffect(() => {
         if (isOpen && !historyLoaded) {
             setLoading(true);
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
             const token = localStorage.getItem('access_token');
-            fetch(`${apiUrl}/api/v1/chat/history`, {
+            fetch(`${API_V1_URL}/chat/history`, {
                 headers: token ? { 'Authorization': `Bearer ${token}` } : {}
             })
                 .then(res => res.json())
@@ -26,7 +41,7 @@ export default function AIChatWidget() {
                         const formatted = data.messages.map((m: any) => ({
                             id: m.id,
                             role: m.role,
-                            content: m.content
+                            content: sanitizeContent(m.content)
                         }));
                         setChatMessages(formatted);
                     }
@@ -47,37 +62,52 @@ export default function AIChatWidget() {
         }
     }, [chatMessages, isOpen]);
 
-    const sendChatMessage = async () => {
-        if (!chatInput.trim()) return;
+    const clearChatHistory = async () => {
+        try {
+            const token = localStorage.getItem('access_token');
+            await fetch(`${API_V1_URL}/chat/history`, {
+                method: 'DELETE',
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
+            setChatMessages([
+                { id: Date.now(), role: 'assistant', content: "Chat history cleared. How can I help protect you today?" }
+            ]);
+        } catch (err) {
+            console.error("Failed to clear chat", err);
+        }
+    };
 
-        const newUserMessage = { id: Date.now(), role: 'user', content: chatInput };
+    const sendChatMessage = async (customText?: string) => {
+        const text = (customText !== undefined ? customText : chatInput).trim();
+        if (!text) return;
+
+        const newUserMessage = { id: Date.now(), role: 'user', content: text };
         setChatMessages(prev => [...prev, newUserMessage]);
-        setChatInput("");
+        if (customText === undefined) setChatInput("");
         setLoading(true);
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
             const token = localStorage.getItem('access_token');
-            const res = await fetch(`${apiUrl}/api/v1/chat`, {
+            const res = await fetch(`${API_V1_URL}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
                 body: JSON.stringify({
                     role: "user",
-                    content: chatInput
+                    content: text
                 })
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             
             if (data.content) {
-                setChatMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: data.content }]);
+                setChatMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: sanitizeContent(data.content) }]);
             } else {
-                setChatMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: "Sorry, I couldn't process that." }]);
+                setChatMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: "⏳ AI response took longer than expected. Please retry in a few moments." }]);
             }
+        } catch (error: any) {
+            console.warn("Chat connection issue:", error?.message || error);
+            setChatMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: "⚠️ Could not connect to Baitlock AI service. Please verify the backend is running." }]);
+        } finally {
             setLoading(false);
-        } catch (error) {
-            console.error(error);
-            setLoading(false);
-            setChatMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: "An error occurred while connecting to Baitlock." }]);
         }
     };
 
@@ -95,32 +125,70 @@ export default function AIChatWidget() {
                             <ShieldAlert size={18} className="text-blue-300" />
                             <span className="font-cormorant font-bold text-xl tracking-wide">Baitlock AI</span>
                         </div>
-                        <button onClick={() => setIsOpen(false)} className="text-white/50 hover:text-white transition-colors">
-                            <X size={20} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={clearChatHistory} 
+                                title="Reset / Clear Chat"
+                                className="text-white/40 hover:text-white/90 transition-colors p-1 rounded hover:bg-white/10 cursor-pointer"
+                            >
+                                <RotateCcw size={15} />
+                            </button>
+                            <button onClick={() => setIsOpen(false)} className="text-white/50 hover:text-white transition-colors cursor-pointer">
+                                <X size={20} />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Messages Area */}
                     <div className="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-4">
                         {chatMessages.map((msg) => (
                             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] p-3 rounded-[9px] text-[15px] font-inter leading-relaxed ${
+                                <div className={`max-w-[92%] p-3.5 rounded-[12px] text-sm font-inter leading-relaxed shadow-lg ${
                                     msg.role === 'user' 
                                         ? 'bg-[#0048A6] text-white rounded-br-none' 
-                                        : 'bg-white/10 text-white/90 border border-white/5 rounded-bl-none'
+                                        : 'bg-white/10 text-white/95 border border-white/10 rounded-bl-none'
                                 }`}>
-                                    {msg.content}
+                                    <MarkdownMessage content={msg.content} isUser={msg.role === 'user'} />
                                 </div>
                             </div>
                         ))}
                         {loading && (
                             <div className="flex justify-start">
-                                <div className="max-w-[85%] p-3 rounded-[9px] rounded-bl-none bg-white/10 border border-white/5 text-white/50 text-sm animate-pulse">
-                                    Analyzing...
+                                <div className="max-w-[85%] p-3 rounded-[9px] rounded-bl-none bg-white/10 border border-white/5 text-blue-200 text-sm flex items-center gap-2">
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                                    </span>
+                                    <span>Baitlock AI is analyzing...</span>
                                 </div>
                             </div>
                         )}
                         <div ref={chatEndRef} />
+                    </div>
+
+                    {/* Quick Suggestions */}
+                    <div className="px-3 py-1.5 bg-[#000D1F]/70 border-t border-white/5 flex gap-1.5 overflow-x-auto no-scrollbar">
+                        <button
+                            type="button"
+                            onClick={() => sendChatMessage("Add phishing-test.com to my blocklist")}
+                            className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 transition-colors cursor-pointer"
+                        >
+                            + Block Domain
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => sendChatMessage("Add safe-portal.org to my whitelist")}
+                            className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-green-500/10 hover:bg-green-500/20 text-green-300 border border-green-500/20 transition-colors cursor-pointer"
+                        >
+                            + Whitelist Domain
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => sendChatMessage("What is my current threat status?")}
+                            className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 transition-colors cursor-pointer"
+                        >
+                            Status Check
+                        </button>
                     </div>
 
                     {/* Input Area */}
@@ -134,9 +202,9 @@ export default function AIChatWidget() {
                             className="flex-1 bg-[#12141A] border border-white/10 text-white placeholder-white/30 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-white/30 transition-colors"
                         />
                         <button 
-                            onClick={sendChatMessage} 
+                            onClick={() => sendChatMessage()} 
                             disabled={loading || !chatInput.trim()}
-                            className="px-3 py-2 bg-[#0048A6] hover:bg-[#003882] disabled:opacity-50 text-white rounded-md transition-colors flex items-center justify-center"
+                            className="px-3 py-2 bg-[#0048A6] hover:bg-[#003882] disabled:opacity-50 text-white rounded-md transition-colors flex items-center justify-center cursor-pointer"
                         >
                             <Send size={16} />
                         </button>

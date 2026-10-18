@@ -1,8 +1,8 @@
 import re
 from urllib.parse import urlparse
 
-# Suspicious TLDs often used for phishing
-SUSPICIOUS_TLDS = {'.top', '.xyz', '.club', '.online', '.site', '.click', '.pw', '.vip'}
+# Suspicious TLDs often used for phishing (.tk, .ml, .ga, .cf, .gq, and cheap new gTLDs)
+SUSPICIOUS_TLDS = {'.tk', '.ml', '.ga', '.cf', '.gq', '.top', '.xyz', '.club', '.online', '.site', '.click', '.pw', '.vip'}
 
 def rule_check_phishing(url: str) -> dict:
     """

@@ -2,6 +2,7 @@ import math
 import re
 from urllib.parse import urlparse
 import jellyfish
+import tldextract
 
 # Top targeted brands for quick Levenshtein matching and embedding detection
 TOP_BRANDS = [
@@ -24,9 +25,10 @@ def extract_url_features(url: str) -> dict:
     """
     features = {}
     
-    # 1. Structural features
-    parsed = urlparse(url)
-    domain = parsed.netloc
+    # 1. Structural features with scheme and domain normalization
+    normalized_url = url if "://" in url else f"http://{url}"
+    parsed = urlparse(normalized_url)
+    domain = (parsed.hostname or parsed.netloc or "").split(':')[0].lower()
     path = parsed.path
     
     features['url_length'] = len(url)
@@ -45,36 +47,41 @@ def extract_url_features(url: str) -> dict:
     features['entropy'] = shannon_entropy(url)
     features['domain_entropy'] = shannon_entropy(domain)
     
-    # 4. Brand impersonation
-    # Catch both Typosquatting (paypa1 vs paypal) and Embedded Brands (br-icloud.com)
+    # 4. Brand impersonation using tldextract for accurate registered domain comparison
     min_dist = float('inf')
     brand_match = 0 # 1 if legit exact match, 0 if not
     embedded_brand = 0 # 1 if brand is deceptively embedded
     
+    ext = tldextract.extract(normalized_url)
+    registered_domain = ext.domain.lower()  # e.g. "paypal" from "www.paypal.com"
     domain_lower = domain.lower()
-    
-    # We strip common TLDs for distance comparison to catch paypa1.com -> paypa1
-    domain_base = domain_lower
-    for tld in ['.com', '.org', '.net', '.co', '.info', '.biz', '.br', '.uk']:
-        if domain_base.endswith(tld):
-            domain_base = domain_base[:-len(tld)]
 
     for brand in TOP_BRANDS:
-        # Check if it's the legit brand domain (e.g. apple.com or apple.co.uk)
-        if domain_lower == f"{brand}.com" or domain_lower.startswith(f"{brand}."):
-             brand_match = 1
-             continue
+        # Check if the registered domain IS the brand (e.g. paypal.com, apple.co.uk)
+        if registered_domain == brand:
+            brand_match = 1
+            continue
              
         # Check for deceptive embedding (e.g. br-icloud.com.br, netflix-support.com)
-        if brand in domain_lower:
+        # Only flag if the registered domain is NOT the brand itself
+        if brand in domain_lower and registered_domain != brand:
             embedded_brand = 1
             
-        # Check for typosquatting (e.g. paypa1.com -> paypa1 vs paypal)
-        dist = jellyfish.levenshtein_distance(brand, domain_base)
+        # Check for typosquatting on full domain and sub-tokens (e.g. paypa1.com or paypa1-security.com)
+        dist = jellyfish.levenshtein_distance(brand, registered_domain)
         if dist < min_dist:
             min_dist = dist
+        for part in re.split(r'[-_.]', registered_domain):
+            if len(part) >= 3:
+                part_dist = jellyfish.levenshtein_distance(brand, part)
+                if part_dist < min_dist:
+                    min_dist = part_dist
                     
-    features['brand_impersonation_score'] = min_dist if min_dist != float('inf') else 100
+    # Exact brand matches are not impersonations (score 100 = safe)
+    if brand_match == 1:
+        features['brand_impersonation_score'] = 100
+    else:
+        features['brand_impersonation_score'] = min_dist if min_dist != float('inf') else 100
     features['exact_brand_match'] = brand_match
     features['embedded_brand'] = embedded_brand
     

@@ -1,15 +1,43 @@
 "use client";
 import { useState, useEffect } from "react";
-import { ShieldAlert, CheckCircle, Ban, Trash2, Download } from "lucide-react";
+import { ShieldAlert, CheckCircle, Ban, Trash2, Download, CreditCard, X, Play, RefreshCw, Zap } from "lucide-react";
+import { API_V1_URL } from "@/lib/api";
 
 export default function DashboardPage() {
   const [showLogs, setShowLogs] = useState(true);
   const [events, setEvents] = useState<any[]>([]);
   const [filterType, setFilterType] = useState('All');
+  const [dbStatus, setDbStatus] = useState<'ok' | 'warning' | 'error'>('warning');
+  const [llmStatus, setLlmStatus] = useState<'ok' | 'warning' | 'error'>('warning');
+
+  // Fraud Simulation State
+  const [showFraudModal, setShowFraudModal] = useState(false);
+  const [fraudAmount, setFraudAmount] = useState("12500");
+  const [fraudVelocity, setFraudVelocity] = useState("18");
+  const [fraudHour, setFraudHour] = useState("3");
+  const [fraudGeoDistance, setFraudGeoDistance] = useState("4500");
+  const [fraudLoading, setFraudLoading] = useState(false);
+  const [fraudResult, setFraudResult] = useState<any>(null);
 
   const averageScore = events.length > 0 ? Math.round(events.reduce((acc, evt) => acc + evt.score, 0) / events.length) : 100;
   const criticalEvents = events.filter(e => e.tier === 'critical' || e.tier === 'high');
   const filteredEvents = filterType === 'All' ? events : events.filter(e => e.type.toLowerCase() === filterType.toLowerCase());
+
+  const fetchEvents = () => {
+    let url = `${API_V1_URL}/events?limit=20`;
+    if (filterType !== 'All') {
+      url += `&type=${filterType.toLowerCase()}`;
+    }
+    const token = localStorage.getItem('access_token');
+    const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    fetch(url, { headers })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.events) setEvents(data.events);
+      })
+      .catch(err => console.warn("Dashboard events fetch warning:", err?.message || err));
+  };
 
   const handleClearLogs = () => {
     setEvents([]);
@@ -33,28 +61,86 @@ export default function DashboardPage() {
     URL.revokeObjectURL(url);
   };
 
-  useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    let url = `${apiUrl}/api/v1/events?limit=10`;
-    if (filterType !== 'All') {
-      url += `&type=${filterType.toLowerCase()}`;
+  const handleSimulateFraud = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFraudLoading(true);
+    setFraudResult(null);
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(`${API_V1_URL}/fraud/score`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          transaction: {
+            amount: parseFloat(fraudAmount) || 0,
+            velocity: parseInt(fraudVelocity, 10) || 1,
+            hour: parseInt(fraudHour, 10) || 12,
+            geo_distance: parseFloat(fraudGeoDistance) || 0
+          }
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setFraudResult(data);
+        fetchEvents();
+      } else {
+        alert("Failed to analyze transaction.");
+      }
+    } catch (err: any) {
+      alert("Error scoring transaction: " + (err?.message || err));
+    } finally {
+      setFraudLoading(false);
     }
-    const token = localStorage.getItem('access_token');
-    const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
-    
-    fetch(url, { headers })
-      .then(res => res.json())
+  };
+
+  const applyPreset = (amount: string, velocity: string, hour: string, geo: string) => {
+    setFraudAmount(amount);
+    setFraudVelocity(velocity);
+    setFraudHour(hour);
+    setFraudGeoDistance(geo);
+    setFraudResult(null);
+  };
+
+  useEffect(() => {
+    // Check backend health
+    fetch(`${API_V1_URL}/health`)
+      .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (data.events) setEvents(data.events);
+        if (data) {
+          setDbStatus(data.database === 'connected' ? 'ok' : 'error');
+          setLlmStatus(data.status === 'healthy' ? 'ok' : 'warning');
+        } else {
+          setDbStatus('error');
+          setLlmStatus('error');
+        }
       })
-      .catch(console.error);
+      .catch(() => {
+        setDbStatus('error');
+        setLlmStatus('error');
+      });
+
+    fetchEvents();
   }, [filterType]);
 
   return (
     <>
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 md:mb-10">
-        <h2 className="font-cormorant text-[48px] md:text-[64px] leading-14.5 md:leading-19.5 font-bold tracking-tight mb-4 md:mb-0">Threat Matrix</h2>
-        <div className="flex items-center gap-4 mb-4">
+        <div>
+          <h2 className="font-cormorant text-[48px] md:text-[64px] leading-14.5 md:leading-19.5 font-bold tracking-tight mb-1">Threat Matrix</h2>
+          <p className="text-white/60 font-inter text-sm">Real-time behavioral telemetry, phishing signals, and fraud detection.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
+          <button 
+            onClick={() => { setShowFraudModal(true); setFraudResult(null); }}
+            className="flex items-center gap-2 px-4 py-2 rounded-md bg-linear-to-r from-[#0048A6] to-[#00214D] text-white font-inter text-sm font-medium hover:brightness-125 transition-all border border-[#0055c4]/50 shadow-[0_0_15px_rgba(0,72,166,0.5)] cursor-pointer"
+          >
+            <CreditCard className="w-4 h-4 text-cyan-300" />
+            Simulate Fraud Txn
+          </button>
           {!showLogs ? (
             <button onClick={() => setShowLogs(true)} className="flex items-center gap-2 px-4 py-2 rounded-md bg-linear-to-r from-[#003882] to-[#0048A6] text-white font-inter text-sm font-medium hover:brightness-110 transition-all border border-white/10 shadow-[0_0_12px_rgba(0,30,100,0.4)] cursor-pointer">
               Restore logs
@@ -97,8 +183,8 @@ export default function DashboardPage() {
             <h3 className="font-medium text-[24px] leading-7.5 tracking-tight relative z-10 mb-4">Module<br />Status</h3>
             <div className="my-auto flex flex-col gap-3 z-10 w-full">
               <StatusItem label="Ingestion" status={events.length > 0 ? "ok" : "warning"} />
-              <StatusItem label="LLM Analysis" status="ok" />
-              <StatusItem label="Db Sync" status="ok" />
+              <StatusItem label="LLM Analysis" status={llmStatus} />
+              <StatusItem label="Db Sync" status={dbStatus} />
             </div>
           </div>
 
@@ -216,6 +302,203 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Fraud Simulation Modal */}
+      {showFraudModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-2xl bg-[#001736] border border-[#0048A6]/40 rounded-xl shadow-[0_0_50px_rgba(0,30,80,0.8)] p-6 md:p-8 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-[#0048A6]/20 border border-[#0048A6]/40">
+                  <CreditCard className="w-6 h-6 text-cyan-400" />
+                </div>
+                <div>
+                  <h3 className="font-cormorant font-bold text-2xl text-white">Transaction Fraud Simulator</h3>
+                  <p className="text-white/50 font-inter text-xs">Simulate transaction parameters to test Layer 1 rules & Layer 2 ML anomaly detection.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowFraudModal(false)}
+                className="p-1 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto custom-scrollbar pr-2 flex-1 space-y-6">
+              {/* Presets */}
+              <div>
+                <label className="block text-xs font-mono uppercase text-white/50 mb-2">Quick Presets</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => applyPreset("15000", "18", "3", "3500")}
+                    className="p-2.5 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-left text-xs transition-colors cursor-pointer"
+                  >
+                    <div className="font-bold text-red-400">Critical: Exceeds Limit</div>
+                    <div className="text-white/50 font-mono text-[10px] mt-0.5">$15k • 18 txns • 3 AM</div>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => applyPreset("350", "2", "23", "5500")}
+                    className="p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-left text-xs transition-colors cursor-pointer"
+                  >
+                    <div className="font-bold text-amber-300">High: Geo-Velocity</div>
+                    <div className="text-white/50 font-mono text-[10px] mt-0.5">$350 • 2 txns • 5,500 mi</div>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => applyPreset("42.50", "1", "14", "8")}
+                    className="p-2.5 rounded-lg border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 text-left text-xs transition-colors cursor-pointer"
+                  >
+                    <div className="font-bold text-green-400">Safe: Normal Purchase</div>
+                    <div className="text-white/50 font-mono text-[10px] mt-0.5">$42.50 • 1 txn • 8 mi</div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleSimulateFraud} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-white/70 mb-1">Transaction Amount ($)</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      value={fraudAmount} 
+                      onChange={(e) => setFraudAmount(e.target.value)}
+                      required
+                      className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none"
+                      placeholder="e.g. 150.00"
+                    />
+                    <span className="text-[10px] text-white/40 block mt-0.5">Hard limit rule triggers above $10,000</span>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-white/70 mb-1">Velocity (txns in last hour)</label>
+                    <input 
+                      type="number" 
+                      value={fraudVelocity} 
+                      onChange={(e) => setFraudVelocity(e.target.value)}
+                      required
+                      className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none"
+                      placeholder="e.g. 2"
+                    />
+                    <span className="text-[10px] text-white/40 block mt-0.5">Frequent attempts trigger velocity rules</span>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-white/70 mb-1">Hour of Day (0–23)</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      max="23"
+                      value={fraudHour} 
+                      onChange={(e) => setFraudHour(e.target.value)}
+                      required
+                      className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none"
+                      placeholder="e.g. 14"
+                    />
+                    <span className="text-[10px] text-white/40 block mt-0.5">Off-hours (2:00–4:00 AM) increase anomaly score</span>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-white/70 mb-1">Geo Distance (miles from home)</label>
+                    <input 
+                      type="number" 
+                      step="0.1"
+                      value={fraudGeoDistance} 
+                      onChange={(e) => setFraudGeoDistance(e.target.value)}
+                      required
+                      className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none"
+                      placeholder="e.g. 25.0"
+                    />
+                    <span className="text-[10px] text-white/40 block mt-0.5">&gt; 5,000 miles triggers impossible travel</span>
+                  </div>
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={fraudLoading}
+                  className="w-full py-2.5 rounded-lg bg-linear-to-r from-[#0048A6] to-[#00214D] hover:brightness-125 text-white font-inter text-sm font-semibold flex items-center justify-center gap-2 transition-all border border-cyan-500/30 shadow-[0_0_15px_rgba(0,150,255,0.3)] cursor-pointer disabled:opacity-50"
+                >
+                  {fraudLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Evaluating Neural Models...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4 text-cyan-300" />
+                      Evaluate Transaction Risk
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Result Display */}
+              {fraudResult && (
+                <div className="p-4 rounded-xl border border-white/15 bg-black/40 space-y-3 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs uppercase font-mono text-white/50">Assessment Verdict</div>
+                      <div className="text-xl font-bold font-cormorant text-white flex items-center gap-2">
+                        {fraudResult.verdict}
+                        <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full font-bold border ${
+                          fraudResult.tier === 'critical' ? 'bg-red-500/20 text-red-400 border-red-500/40' :
+                          fraudResult.tier === 'high' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
+                          fraudResult.tier === 'moderate' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' :
+                          'bg-green-500/20 text-green-400 border-green-500/40'
+                        }`}>
+                          {fraudResult.tier}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs uppercase font-mono text-white/50">Security Score</div>
+                      <div className={`text-2xl font-mono font-bold ${
+                        fraudResult.final_score < 30 ? 'text-red-400' :
+                        fraudResult.final_score < 70 ? 'text-amber-300' : 'text-green-400'
+                      }`}>
+                        {fraudResult.final_score}/100
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-white/5 p-2 rounded-lg border border-white/5">
+                    <div>Rule Score: <span className="text-cyan-300 font-bold">{fraudResult.breakdown?.rule_score}/100</span></div>
+                    <div>ML Score: <span className="text-cyan-300 font-bold">{fraudResult.breakdown?.ml_score}/100</span></div>
+                  </div>
+
+                  {fraudResult.reasons && fraudResult.reasons.length > 0 && (
+                    <div>
+                      <div className="text-xs font-medium text-white/60 mb-1">Triggered Indicators:</div>
+                      <ul className="space-y-1">
+                        {fraudResult.reasons.map((r: string, idx: number) => (
+                          <li key={idx} className="text-xs font-inter text-red-300/90 flex items-start gap-1.5">
+                            <span className="text-red-400 font-mono">•</span>
+                            <span>{r}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex justify-end gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setFilterType('Fraud');
+                        setShowFraudModal(false);
+                      }}
+                      className="text-xs font-medium px-4 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                    >
+                      View in Threat Matrix
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

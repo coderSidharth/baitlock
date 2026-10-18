@@ -1,9 +1,25 @@
 import json
+import sys
+from pathlib import Path
+
+# Add server directory to sys.path so 'app' is importable when run directly
+server_dir = Path(__file__).resolve().parent.parent
+if str(server_dir) not in sys.path:
+    sys.path.insert(0, str(server_dir))
+
 from app.features.phishing.service import score_phishing_service
 from app.features.fraud.service import score_transaction_service
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, engine, Base
+# Ensure all models are registered with Base metadata
+from app.features.auth import models as auth_models
+from app.features.phishing import models as phishing_models
+from app.features.fraud import models as fraud_models
+from app.features.chat import models as chat_models
+from app.features.companies import models as companies_models
 
 def run_tests():
+    # Ensure database schema is ready
+    Base.metadata.create_all(bind=engine)
     print("Testing Phishing Engine...\n")
     
     db = SessionLocal()
