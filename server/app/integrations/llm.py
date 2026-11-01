@@ -183,7 +183,6 @@ def chat_with_llm(messages: list) -> dict:
     Returns the message object which may contain 'content' and 'tool_calls'.
     """
     config = get_llm_config()
-<<<<<<< HEAD
     provider = config.get("provider", "groq").lower()
     groq_api_key = config.get("groq_api_key", "")
     groq_model = config.get("groq_model", "openai/gpt-oss-20b")
@@ -203,29 +202,6 @@ def chat_with_llm(messages: list) -> dict:
                             "domain": {"type": "string", "description": "The domain name (e.g. google.com)"}
                         },
                         "required": ["domain"]
-=======
-    llm_provider = config["provider"]
-    ollama_model = config["ollama_model"]
-    ollama_url = config["ollama_url"]
-    groq_api_key = config["groq_api_key"]
-    groq_model = config["groq_model"]
-
-    if llm_provider.lower() == "groq":
-        try:
-            tools = [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "add_to_whitelist",
-                        "description": "Add a domain to the user's whitelist so it is never blocked.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "domain": {"type": "string", "description": "The domain name (e.g. google.com)"}
-                            },
-                            "required": ["domain"]
-                        }
->>>>>>> temp-fixes
                     }
                 }
             },
