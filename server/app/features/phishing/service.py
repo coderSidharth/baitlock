@@ -55,13 +55,8 @@ def fetch_page_content(url: str) -> str:
 
 
 def score_phishing_service(db: Session, url: str, text_content: str = None, user_id: int = None, fast_mode: bool = False) -> dict:
-    domain = (urlparse(url).hostname or urlparse(url).netloc or url).lower().split(':')[0].replace("www.", "")
+    domain = normalize_domain(url)
     if user_id:
-<<<<<<< HEAD
-=======
-        domain = normalize_domain(url)
-        
->>>>>>> temp-fixes
         # Check BLOCKLIST first (takes priority over everything)
         blocklist_entry = db.query(UserBlocklist).filter(
             UserBlocklist.user_id == user_id,
@@ -145,7 +140,6 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
     
     # Calculate base score from Rule and ML engines
     base_weighted = (rule_res["rule_score"] * 0.4) + (ml_res["ml_score"] * 0.6)
-<<<<<<< HEAD
     base_min = min(rule_res["rule_score"], ml_res["ml_score"])
     
     # If either engine is very confident it's phishing (< 30), use the min to penalize hard.
@@ -154,9 +148,6 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
         base_score = int(base_min)
     else:
         base_score = int(base_weighted)
-=======
-    base_score = int(base_weighted)
->>>>>>> temp-fixes
 
     # Early Exit Strategy: Avoid slow LLM if the site is decisively malicious or very safe, OR if fast_mode is True
     if not fast_mode and text_content and 40 <= base_score <= 85:

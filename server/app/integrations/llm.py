@@ -145,13 +145,8 @@ def analyze_text_with_llm(text_content: str) -> dict:
                 "llm_score": inverted_score,
                 "llm_reason": data.get("explanation", "Analyzed by AI.")
             }
-<<<<<<< HEAD
-        except Exception:
-            return {"llm_score": 50, "llm_reason": "Analyzed by AI."}
-=======
         except Exception as e:
             return {"llm_score": None, "llm_reason": f"Groq API error: {str(e)}"}
->>>>>>> temp-fixes
 
     else:
         # Default to Ollama
@@ -178,14 +173,9 @@ def analyze_text_with_llm(text_content: str) -> dict:
                 "llm_score": inverted_score,
                 "llm_reason": data.get("explanation", "Analyzed by Ollama.")
             }
-<<<<<<< HEAD
-        except Exception:
-            return {"llm_score": 50, "llm_reason": "AI deep inspection temporarily deferred."}
-=======
         except Exception as e:
             print(f"Ollama error: {e}")
             return {"llm_score": None, "llm_reason": f"Ollama local API error: {str(e)}"}
->>>>>>> temp-fixes
 
 def chat_with_llm(messages: list) -> dict:
     """
