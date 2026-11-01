@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from urllib.parse import urlparse
 
-from app.api.deps import get_db, get_optional_user
+from app.api.deps import get_db, get_current_user
 from app.features.auth.models import User
 from app.features.companies import models, schemas
 
@@ -12,7 +12,7 @@ router = APIRouter()
 def flag_company(
     payload: schemas.CompanyFlagCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
     try:
         parsed_url = urlparse(payload.url)
@@ -29,7 +29,7 @@ def flag_company(
     flag = models.CompanyFlag(
         domain=domain,
         flag_type=payload.flag_type,
-        user_id=current_user.id if current_user else None
+        user_id=current_user.id
     )
 
     db.add(flag)

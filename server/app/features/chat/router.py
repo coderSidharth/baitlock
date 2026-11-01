@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
-from app.api.deps import get_db, get_optional_user
+from app.api.deps import get_db, get_current_user
 from app.features.auth.models import User
 from app.features.chat.models import ChatMessage
 from app.features.chat.schemas import ChatMessageCreate, ChatMessageOut, ChatHistoryResponse
@@ -17,16 +17,17 @@ import json
 def send_chat_message(
     msg: ChatMessageCreate, 
     db: Session = Depends(get_db), 
-    current_user: User = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    user_id = current_user.id if current_user else 1
+    user_id = current_user.id
     # Save user message
     user_msg = ChatMessage(user_id=user_id, role="user", content=msg.content)
     db.add(user_msg)
     db.commit()
     
     # Fetch history
-    history = db.query(ChatMessage).filter(ChatMessage.user_id == user_id).order_by(ChatMessage.created_at.asc()).limit(10).all()
+    history = db.query(ChatMessage).filter(ChatMessage.user_id == user_id).order_by(ChatMessage.created_at.desc()).limit(10).all()
+    history.reverse()
     
     messages = [{"role": "system", "content": "You are Baitlock, an agentic cybersecurity assistant. You can manage blocklists, whitelists, and clear logs using tools. Always confirm what action you took."}]
     for h in history:
@@ -76,8 +77,8 @@ def send_chat_message(
                             tool_result = f"Removed {domain} from blocklist."
                             
                         elif func_name == "clear_logs":
-                            db.query(PhishingEvent).delete()
-                            db.query(FraudEvent).delete()
+                            db.query(PhishingEvent).filter(PhishingEvent.user_id == user_id).delete()
+                            db.query(FraudEvent).filter(FraudEvent.user_id == user_id).delete()
                             db.commit()
                             tool_result = "All events cleared successfully."
                         else:
@@ -121,8 +122,9 @@ def send_chat_message(
 @router.get("/history", response_model=ChatHistoryResponse)
 def get_chat_history(
     db: Session = Depends(get_db), 
-    current_user: User = Depends(get_optional_user)
+    current_user: User = Depends(get_current_user)
 ):
-    user_id = current_user.id if current_user else 1
-    messages = db.query(ChatMessage).filter(ChatMessage.user_id == user_id).order_by(ChatMessage.created_at.asc()).all()
+    user_id = current_user.id
+    messages = db.query(ChatMessage).filter(ChatMessage.user_id == user_id).order_by(ChatMessage.created_at.desc()).limit(10).all()
+    messages.reverse()
     return {"messages": messages}

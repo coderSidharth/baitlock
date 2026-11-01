@@ -24,7 +24,11 @@ export default function SignupPage() {
             const data = await res.json();
             
             if (!res.ok) {
-                setError(data.detail || "Failed to register");
+                const detail = data.detail;
+                const message = Array.isArray(detail)
+                    ? detail.map((item: unknown) => typeof item === "object" && item !== null && "msg" in item ? String((item as { msg: unknown }).msg) : String(item)).join(", ")
+                    : typeof detail === "string" ? detail : "Failed to register";
+                setError(message);
                 setLoading(false);
                 return;
             }
@@ -40,6 +44,7 @@ export default function SignupPage() {
             if (loginRes.ok && loginData.access_token) {
                 localStorage.setItem('access_token', loginData.access_token);
                 localStorage.setItem('isLoggedIn', 'true');
+                window.postMessage({ type: 'BAITLOCK_LOGIN', token: loginData.access_token }, '*');
                 router.push('/dashboard');
             } else {
                 router.push('/login');

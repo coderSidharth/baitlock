@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import Optional
 from app.features.auth.models import User
-from app.api.deps import get_db, get_optional_user
+from app.api.deps import get_db, get_current_user
 from app.features.phishing.schemas import PhishingCheckRequest, PhishingScoreResponse
-from app.features.phishing.service import score_phishing_service
+from app.features.phishing.service import score_phishing_service, normalize_domain
 
 router = APIRouter()
 
@@ -12,10 +11,9 @@ router = APIRouter()
 def check_phishing(
     req: PhishingCheckRequest, 
     db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_optional_user)
+    user: User = Depends(get_current_user)
 ):
-    user_id = user.id if user else 1
-    return score_phishing_service(db, req.url, req.page_text, user_id=user_id, fast_mode=req.fast_mode)
+    return score_phishing_service(db, req.url, req.page_text, user_id=user.id, fast_mode=req.fast_mode)
 
 from app.features.phishing.schemas import WhitelistRequest
 from app.api.deps import get_current_user
@@ -25,9 +23,9 @@ from urllib.parse import urlparse
 @router.get("/whitelist")
 def get_whitelist(
     db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_optional_user)
+    user: User = Depends(get_current_user)
 ):
-    user_id = user.id if user else 1
+    user_id = user.id
     whitelists = db.query(UserWhitelist).filter(UserWhitelist.user_id == user_id).all()
     return {"whitelist": [{"domain": w.domain} for w in whitelists]}
 
@@ -35,10 +33,10 @@ def get_whitelist(
 def add_to_whitelist(
     req: WhitelistRequest,
     db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_optional_user)
+    user: User = Depends(get_current_user)
 ):
-    user_id = user.id if user else 1
-    domain = urlparse(req.domain).netloc or req.domain
+    user_id = user.id
+    domain = normalize_domain(req.domain)
     # Check if already whitelisted
     existing = db.query(UserWhitelist).filter(
         UserWhitelist.user_id == user_id,
@@ -56,10 +54,10 @@ def add_to_whitelist(
 def remove_from_whitelist(
     req: WhitelistRequest,
     db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_optional_user)
+    user: User = Depends(get_current_user)
 ):
-    user_id = user.id if user else 1
-    domain = urlparse(req.domain).netloc or req.domain
+    user_id = user.id
+    domain = normalize_domain(req.domain)
     existing = db.query(UserWhitelist).filter(
         UserWhitelist.user_id == user_id,
         UserWhitelist.domain == domain
@@ -77,9 +75,9 @@ from app.features.phishing.models import UserBlocklist
 @router.get("/blocklist")
 def get_blocklist(
     db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_optional_user)
+    user: User = Depends(get_current_user)
 ):
-    user_id = user.id if user else 1
+    user_id = user.id
     blocklists = db.query(UserBlocklist).filter(UserBlocklist.user_id == user_id).all()
     return {"blocklist": [{"domain": b.domain, "created_at": b.created_at.isoformat()} for b in blocklists]}
 
@@ -87,10 +85,10 @@ def get_blocklist(
 def add_to_blocklist(
     req: WhitelistRequest, # reusing schema since it just needs domain
     db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_optional_user)
+    user: User = Depends(get_current_user)
 ):
-    user_id = user.id if user else 1
-    domain = urlparse(req.domain).netloc or req.domain
+    user_id = user.id
+    domain = normalize_domain(req.domain)
     existing = db.query(UserBlocklist).filter(
         UserBlocklist.user_id == user_id,
         UserBlocklist.domain == domain
@@ -106,10 +104,10 @@ def add_to_blocklist(
 def remove_from_blocklist(
     req: WhitelistRequest,
     db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_optional_user)
+    user: User = Depends(get_current_user)
 ):
-    user_id = user.id if user else 1
-    domain = urlparse(req.domain).netloc or req.domain
+    user_id = user.id
+    domain = normalize_domain(req.domain)
     existing = db.query(UserBlocklist).filter(
         UserBlocklist.user_id == user_id,
         UserBlocklist.domain == domain

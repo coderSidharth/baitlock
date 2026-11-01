@@ -1,10 +1,10 @@
 "use client";
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ShieldAlert, AlertTriangle, ArrowLeft } from 'lucide-react';
 
-export default function Home() {
+function HomeContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const searchParams = useSearchParams();
   const isBlocked = searchParams.get('blocked') === 'true';
@@ -112,4 +112,8 @@ export default function Home() {
       </main>
     </div>
   );
+}
+
+export default function Home() {
+  return <Suspense fallback={null}><HomeContent /></Suspense>;
 }
