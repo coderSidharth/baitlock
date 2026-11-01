@@ -24,7 +24,7 @@ def list_events(
     if type is None or type == "phishing":
         phishing_db = db.query(PhishingEvent).filter(
             PhishingEvent.user_id == user.id
-        ).order_by(PhishingEvent.created_at.desc()).limit(limit).all()
+        ).order_by(PhishingEvent.created_at.desc()).offset(offset).limit(limit).all()
         for e in phishing_db:
             try:
                 reasons = json.loads(e.reasons_jsonb) if e.reasons_jsonb else []
@@ -44,7 +44,7 @@ def list_events(
     if type is None or type == "fraud":
         fraud_db = db.query(FraudEvent).filter(
             FraudEvent.user_id == user.id
-        ).order_by(FraudEvent.created_at.desc()).limit(limit).all()
+        ).order_by(FraudEvent.created_at.desc()).offset(offset).limit(limit).all()
         for e in fraud_db:
             try:
                 reasons = json.loads(e.reasons_jsonb) if e.reasons_jsonb else []

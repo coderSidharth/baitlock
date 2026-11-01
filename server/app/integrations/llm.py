@@ -62,7 +62,14 @@ def analyze_text_with_llm(text_content: str) -> dict:
     Returns a dictionary with 'llm_score' and 'llm_reason'.
     """
     if not text_content or len(text_content.strip()) < 10:
-        return {"llm_score": 0, "llm_reason": "Not enough text to analyze."}
+        return {"llm_score": None, "llm_reason": "Not enough text to analyze."}
+
+    config = get_llm_config()
+    llm_provider = config["provider"]
+    ollama_model = config["ollama_model"]
+    ollama_url = config["ollama_url"]
+    groq_api_key = config["groq_api_key"]
+    groq_model = config["groq_model"]
 
     # Truncate to first 2,000 characters to stay well within TPM quotas
     sanitized_text = text_content[:2000].strip()
@@ -85,6 +92,7 @@ def analyze_text_with_llm(text_content: str) -> dict:
     "{sanitized_text}"
     """
 
+<<<<<<< HEAD
     config = get_llm_config()
     provider = config.get("provider", "groq").lower()
     groq_api_key = config.get("groq_api_key", "")
@@ -106,6 +114,23 @@ def analyze_text_with_llm(text_content: str) -> dict:
 
         try:
             raw_text = res_data["choices"][0]["message"]["content"].strip()
+=======
+    if llm_provider.lower() == "groq":
+        try:
+            payload = {
+                "model": groq_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.1
+            }
+            headers = {
+                "Authorization": f"Bearer {groq_api_key}",
+                "Content-Type": "application/json"
+            }
+            res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=120)
+            res.raise_for_status()
+            
+            raw_text = res.json()["choices"][0]["message"]["content"].strip()
+>>>>>>> temp-fixes
             if raw_text.startswith("```json"):
                 raw_text = raw_text.split("```json")[1].split("```")[0].strip()
             elif raw_text.startswith("```"):
@@ -120,8 +145,13 @@ def analyze_text_with_llm(text_content: str) -> dict:
                 "llm_score": inverted_score,
                 "llm_reason": data.get("explanation", "Analyzed by AI.")
             }
+<<<<<<< HEAD
         except Exception:
             return {"llm_score": 50, "llm_reason": "Analyzed by AI."}
+=======
+        except Exception as e:
+            return {"llm_score": None, "llm_reason": f"Groq API error: {str(e)}"}
+>>>>>>> temp-fixes
 
     else:
         # Default to Ollama
@@ -148,8 +178,14 @@ def analyze_text_with_llm(text_content: str) -> dict:
                 "llm_score": inverted_score,
                 "llm_reason": data.get("explanation", "Analyzed by Ollama.")
             }
+<<<<<<< HEAD
         except Exception:
             return {"llm_score": 50, "llm_reason": "AI deep inspection temporarily deferred."}
+=======
+        except Exception as e:
+            print(f"Ollama error: {e}")
+            return {"llm_score": None, "llm_reason": f"Ollama local API error: {str(e)}"}
+>>>>>>> temp-fixes
 
 def chat_with_llm(messages: list) -> dict:
     """
@@ -157,6 +193,7 @@ def chat_with_llm(messages: list) -> dict:
     Returns the message object which may contain 'content' and 'tool_calls'.
     """
     config = get_llm_config()
+<<<<<<< HEAD
     provider = config.get("provider", "groq").lower()
     groq_api_key = config.get("groq_api_key", "")
     groq_model = config.get("groq_model", "openai/gpt-oss-20b")
@@ -176,6 +213,29 @@ def chat_with_llm(messages: list) -> dict:
                             "domain": {"type": "string", "description": "The domain name (e.g. google.com)"}
                         },
                         "required": ["domain"]
+=======
+    llm_provider = config["provider"]
+    ollama_model = config["ollama_model"]
+    ollama_url = config["ollama_url"]
+    groq_api_key = config["groq_api_key"]
+    groq_model = config["groq_model"]
+
+    if llm_provider.lower() == "groq":
+        try:
+            tools = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "add_to_whitelist",
+                        "description": "Add a domain to the user's whitelist so it is never blocked.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "domain": {"type": "string", "description": "The domain name (e.g. google.com)"}
+                            },
+                            "required": ["domain"]
+                        }
+>>>>>>> temp-fixes
                     }
                 }
             },
@@ -231,6 +291,7 @@ def chat_with_llm(messages: list) -> dict:
                         "properties": {}
                     }
                 }
+<<<<<<< HEAD
             }
         ]
         
@@ -247,6 +308,20 @@ def chat_with_llm(messages: list) -> dict:
             return {
                 "role": "assistant",
                 "content": "⏳ **Baitlock AI is momentarily busy processing high-volume security requests.**\n\nPlease wait a few moments (15–30 seconds) for the security engine quota to refresh, then ask your question again."
+=======
+            ]
+            
+            payload = {
+                "model": groq_model,
+                "messages": messages,
+                "temperature": 0.3,
+                "tools": tools,
+                "tool_choice": "auto"
+            }
+            headers = {
+                "Authorization": f"Bearer {groq_api_key}",
+                "Content-Type": "application/json"
+>>>>>>> temp-fixes
             }
         elif error or not res_data:
             return {

@@ -25,8 +25,8 @@ def send_chat_message(
     db.add(user_msg)
     db.commit()
     
-    # Fetch the 6 most recent clean messages in chronological order to save tokens
-    recent_history = db.query(ChatMessage).filter(ChatMessage.user_id == user_id).order_by(ChatMessage.created_at.desc()).limit(6).all()
+    # Fetch recent clean messages in chronological order to save tokens
+    recent_history = db.query(ChatMessage).filter(ChatMessage.user_id == user_id).order_by(ChatMessage.created_at.desc()).limit(10).all()
     history = [h for h in reversed(recent_history) if not any(err in (h.content or "") for err in ["Groq API error", "Ollama local API", "Client Error:"])]
     
     # Gather live telemetry for assistant context

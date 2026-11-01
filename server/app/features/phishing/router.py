@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import Optional
 from app.features.auth.models import User
+<<<<<<< HEAD
 from app.api.deps import get_db, get_optional_user, get_current_user
+=======
+from app.api.deps import get_db, get_current_user
+>>>>>>> temp-fixes
 from app.features.phishing.schemas import PhishingCheckRequest, PhishingScoreResponse
-from app.features.phishing.service import score_phishing_service
+from app.features.phishing.service import score_phishing_service, normalize_domain
 
 router = APIRouter()
 
@@ -12,10 +15,14 @@ router = APIRouter()
 def check_phishing(
     req: PhishingCheckRequest, 
     db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_optional_user)
+    user: User = Depends(get_current_user)
 ):
+<<<<<<< HEAD
     user_id = user.id if user else None
     return score_phishing_service(db, req.url, req.page_text, user_id=user_id, fast_mode=req.fast_mode)
+=======
+    return score_phishing_service(db, req.url, req.page_text, user_id=user.id, fast_mode=req.fast_mode)
+>>>>>>> temp-fixes
 
 from app.features.phishing.schemas import WhitelistRequest
 from app.api.deps import get_current_user
@@ -27,7 +34,12 @@ def get_whitelist(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
+<<<<<<< HEAD
     whitelists = db.query(UserWhitelist).filter(UserWhitelist.user_id == user.id).all()
+=======
+    user_id = user.id
+    whitelists = db.query(UserWhitelist).filter(UserWhitelist.user_id == user_id).all()
+>>>>>>> temp-fixes
     return {"whitelist": [{"domain": w.domain} for w in whitelists]}
 
 @router.post("/whitelist")
@@ -37,7 +49,11 @@ def add_to_whitelist(
     user: User = Depends(get_current_user)
 ):
     user_id = user.id
+<<<<<<< HEAD
     domain = urlparse(req.domain).netloc or req.domain
+=======
+    domain = normalize_domain(req.domain)
+>>>>>>> temp-fixes
     # Check if already whitelisted
     existing = db.query(UserWhitelist).filter(
         UserWhitelist.user_id == user_id,
@@ -58,7 +74,11 @@ def remove_from_whitelist(
     user: User = Depends(get_current_user)
 ):
     user_id = user.id
+<<<<<<< HEAD
     domain = urlparse(req.domain).netloc or req.domain
+=======
+    domain = normalize_domain(req.domain)
+>>>>>>> temp-fixes
     existing = db.query(UserWhitelist).filter(
         UserWhitelist.user_id == user_id,
         UserWhitelist.domain == domain
@@ -78,7 +98,12 @@ def get_blocklist(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
+<<<<<<< HEAD
     blocklists = db.query(UserBlocklist).filter(UserBlocklist.user_id == user.id).all()
+=======
+    user_id = user.id
+    blocklists = db.query(UserBlocklist).filter(UserBlocklist.user_id == user_id).all()
+>>>>>>> temp-fixes
     return {"blocklist": [{"domain": b.domain, "created_at": b.created_at.isoformat()} for b in blocklists]}
 
 @router.post("/blocklist")
@@ -88,7 +113,11 @@ def add_to_blocklist(
     user: User = Depends(get_current_user)
 ):
     user_id = user.id
+<<<<<<< HEAD
     domain = urlparse(req.domain).netloc or req.domain
+=======
+    domain = normalize_domain(req.domain)
+>>>>>>> temp-fixes
     existing = db.query(UserBlocklist).filter(
         UserBlocklist.user_id == user_id,
         UserBlocklist.domain == domain
@@ -107,7 +136,11 @@ def remove_from_blocklist(
     user: User = Depends(get_current_user)
 ):
     user_id = user.id
+<<<<<<< HEAD
     domain = urlparse(req.domain).netloc or req.domain
+=======
+    domain = normalize_domain(req.domain)
+>>>>>>> temp-fixes
     existing = db.query(UserBlocklist).filter(
         UserBlocklist.user_id == user_id,
         UserBlocklist.domain == domain

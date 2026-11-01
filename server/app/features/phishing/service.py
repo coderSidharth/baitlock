@@ -10,6 +10,11 @@ from urllib.parse import urlparse
 import requests
 import re
 
+def normalize_domain(value: str) -> str:
+    candidate = value.strip()
+    parsed = urlparse(candidate if "://" in candidate else f"//{candidate}")
+    return (parsed.hostname or candidate.split("/", 1)[0].split(":", 1)[0]).lower().rstrip(".")
+
 def strip_tags(html: str) -> str:
     text = re.sub(r'<[^>]+>', ' ', html)
     return ' '.join(text.split())
@@ -52,6 +57,11 @@ def fetch_page_content(url: str) -> str:
 def score_phishing_service(db: Session, url: str, text_content: str = None, user_id: int = None, fast_mode: bool = False) -> dict:
     domain = (urlparse(url).hostname or urlparse(url).netloc or url).lower().split(':')[0].replace("www.", "")
     if user_id:
+<<<<<<< HEAD
+=======
+        domain = normalize_domain(url)
+        
+>>>>>>> temp-fixes
         # Check BLOCKLIST first (takes priority over everything)
         blocklist_entry = db.query(UserBlocklist).filter(
             UserBlocklist.user_id == user_id,
@@ -90,6 +100,7 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
     if fast_mode:
         cache_query = db.query(PhishingEvent).filter(
             PhishingEvent.input_url == url,
+            PhishingEvent.user_id == user_id,
             PhishingEvent.created_at >= datetime.utcnow() - timedelta(hours=12)
         )
         if user_id:
@@ -130,10 +141,11 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
         if fetched:
             text_content = fetched
 
-    llm_res = {"llm_score": 0, "llm_reasons": []}
+    llm_res = {"llm_score": None, "llm_reasons": []}
     
     # Calculate base score from Rule and ML engines
     base_weighted = (rule_res["rule_score"] * 0.4) + (ml_res["ml_score"] * 0.6)
+<<<<<<< HEAD
     base_min = min(rule_res["rule_score"], ml_res["ml_score"])
     
     # If either engine is very confident it's phishing (< 30), use the min to penalize hard.
@@ -142,25 +154,31 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
         base_score = int(base_min)
     else:
         base_score = int(base_weighted)
+=======
+    base_score = int(base_weighted)
+>>>>>>> temp-fixes
 
     # Early Exit Strategy: Avoid slow LLM if the site is decisively malicious or very safe, OR if fast_mode is True
     if not fast_mode and text_content and 40 <= base_score <= 85:
         llm_analysis = analyze_text_with_llm(text_content)
-        llm_res["llm_score"] = llm_analysis.get("llm_score", 0)
+        llm_res["llm_score"] = llm_analysis.get("llm_score")
         if llm_analysis.get("llm_reason"):
              llm_res["llm_reasons"] = [llm_analysis["llm_reason"]]
         # Use a purely weighted score to prevent LLM false positives (e.g., security blogs) from completely overriding the ML
-        final_score = int((rule_res["rule_score"] * 0.3) + (ml_res["ml_score"] * 0.4) + (llm_res["llm_score"] * 0.3))
+        if llm_res["llm_score"] is None:
+            final_score = base_score
+        else:
+            final_score = int((rule_res["rule_score"] * 0.3) + (ml_res["ml_score"] * 0.4) + (llm_res["llm_score"] * 0.3))
         
         # If the LLM is highly confident it's a threat (score < 30), aggressively pull down the final score
-        if llm_res["llm_score"] < 30:
+        if llm_res["llm_score"] is not None and llm_res["llm_score"] < 30:
             final_score = min(final_score, llm_res["llm_score"] + 15)
             
     else:
         final_score = base_score
         
     raw_reasons = rule_res["rule_reasons"] + ml_res["ml_reasons"] + llm_res.get("llm_reasons", [])
-    all_reasons = [r for r in raw_reasons if "Ollama local API error" not in r]
+    all_reasons = [r for r in raw_reasons if "API error" not in r and "Not enough text" not in r]
     
     # Check community flags from CompanyFlag
     from app.features.companies.models import CompanyFlag
@@ -187,7 +205,8 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
             
     if is_trusted and final_score < 50:
         # Only cap trusted domains if the LLM didn't explicitly flag the content as highly malicious
-        if llm_res.get("llm_score", 100) >= 30:
+        llm_score = llm_res.get("llm_score")
+        if llm_score is None or llm_score >= 30:
             final_score = 50
             all_reasons.append("Final score was capped to Moderate Risk because the root domain is highly trusted.")
         
@@ -213,7 +232,7 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
         "breakdown": {
             "rule_score": rule_res["rule_score"],
             "ml_score": ml_res["ml_score"],
-            "llm_score": llm_res.get("llm_score", 0)
+            "llm_score": llm_res.get("llm_score") if llm_res.get("llm_score") is not None else 0
         }
     }
     
