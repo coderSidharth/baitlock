@@ -10,6 +10,7 @@ from app.integrations.llm import chat_with_llm
 router = APIRouter()
 
 from app.features.phishing.models import UserWhitelist, UserBlocklist, PhishingEvent
+from app.features.phishing.service import normalize_domain
 from app.features.fraud.models import FraudEvent
 import json
 
@@ -32,10 +33,10 @@ def send_chat_message(
     # Gather live telemetry for assistant context
     active_blocks = [b.domain for b in db.query(UserBlocklist).filter((UserBlocklist.user_id == user_id) | (UserBlocklist.user_id.is_(None))).all()]
     active_whites = [w.domain for w in db.query(UserWhitelist).filter((UserWhitelist.user_id == user_id) | (UserWhitelist.user_id.is_(None))).all()]
-    all_scores = [p[0] for p in db.query(PhishingEvent.final_score).all()] + [f[0] for f in db.query(FraudEvent.final_score).all()]
+    all_scores = [p[0] for p in db.query(PhishingEvent.final_score).filter(PhishingEvent.user_id == user_id).all()] + [f[0] for f in db.query(FraudEvent.final_score).filter(FraudEvent.user_id == user_id).all()]
     avg_score = round(sum(all_scores) / len(all_scores), 1) if all_scores else 100
     total_events = len(all_scores)
-    critical_count = db.query(PhishingEvent).filter(PhishingEvent.verdict.like("%CRITICAL%")).count() + db.query(FraudEvent).filter(FraudEvent.verdict.like("%FRAUD%")).count()
+    critical_count = db.query(PhishingEvent).filter(PhishingEvent.user_id == user_id, PhishingEvent.verdict.like("%CRITICAL%")).count() + db.query(FraudEvent).filter(FraudEvent.user_id == user_id, FraudEvent.verdict.like("%FRAUD%")).count()
 
     system_prompt = f"""You are Baitlock AI, an expert agentic cybersecurity shield and assistant.
 You have real-time access to the user's security posture and threat intelligence telemetry.
@@ -73,32 +74,35 @@ FORMATTING GUIDELINES:
                 
                 for tool_call in response_msg["tool_calls"]:
                     func_name = tool_call["function"]["name"]
-                    args = json.loads(tool_call["function"]["arguments"])
+                    try:
+                        args = json.loads(tool_call["function"]["arguments"])
+                    except (json.JSONDecodeError, TypeError):
+                        args = {}
                     tool_result = ""
                     
                     try:
                         if func_name == "add_to_whitelist":
-                            domain = args.get("domain")
+                            domain = normalize_domain(args.get("domain", ""))
                             if not db.query(UserWhitelist).filter_by(user_id=user_id, domain=domain).first():
                                 db.add(UserWhitelist(user_id=user_id, domain=domain))
                                 db.commit()
                             tool_result = f"Added {domain} to whitelist."
                         
                         elif func_name == "remove_from_whitelist":
-                            domain = args.get("domain")
+                            domain = normalize_domain(args.get("domain", ""))
                             db.query(UserWhitelist).filter_by(user_id=user_id, domain=domain).delete()
                             db.commit()
                             tool_result = f"Removed {domain} from whitelist."
                             
                         elif func_name == "add_to_blocklist":
-                            domain = args.get("domain")
+                            domain = normalize_domain(args.get("domain", ""))
                             if not db.query(UserBlocklist).filter_by(user_id=user_id, domain=domain).first():
                                 db.add(UserBlocklist(user_id=user_id, domain=domain))
                                 db.commit()
                             tool_result = f"Added {domain} to explicit blocklist."
                             
                         elif func_name == "remove_from_blocklist":
-                            domain = args.get("domain")
+                            domain = normalize_domain(args.get("domain", ""))
                             db.query(UserBlocklist).filter_by(user_id=user_id, domain=domain).delete()
                             db.commit()
                             tool_result = f"Removed {domain} from blocklist."

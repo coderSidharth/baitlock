@@ -1,4 +1,5 @@
 import re
+import ipaddress
 from urllib.parse import urlparse
 
 # Suspicious TLDs often used for phishing (.tk, .ml, .ga, .cf, .gq, and cheap new gTLDs)
@@ -13,7 +14,8 @@ def rule_check_phishing(url: str) -> dict:
     reasons = []
     
     parsed = urlparse(url)
-    domain = parsed.netloc
+    # Use hostname (not netloc) to avoid port numbers and userinfo breaking checks
+    domain = (parsed.hostname or "").lower()
     
     if not url.startswith("https://"):
         score -= 20
@@ -26,13 +28,16 @@ def rule_check_phishing(url: str) -> dict:
             reasons.append(f"Domain uses a suspicious TLD ({tld})")
             break
             
-    # Check for direct IP
-    if re.search(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', domain):
+    # Check for direct IP address using proper validation (not unanchored regex)
+    try:
+        ipaddress.ip_address(domain)
         score -= 50
         reasons.append("URL uses an IP address instead of a domain name")
+    except ValueError:
+        pass
         
-    # Check for excessive subdomains (e.g., login.apple.com.secure.verify.net)
-    if domain.count('.') > 3:
+    # Check for excessive subdomains (raised threshold to avoid .co.uk false positives)
+    if domain.count('.') > 4:
         score -= 30
         reasons.append("URL has an unusually high number of subdomains")
         
@@ -40,6 +45,11 @@ def rule_check_phishing(url: str) -> dict:
     if "xn--" in domain:
         score -= 40
         reasons.append("Domain uses Punycode (often used in homograph attacks)")
+
+    # Check for userinfo@ trick (e.g., https://google.com@evil.tk)
+    if parsed.username or "@" in (parsed.netloc or ""):
+        score -= 50
+        reasons.append("URL contains a userinfo@ component (common phishing trick)")
         
     score = max(score, 0)
     

@@ -10,6 +10,7 @@ __pycache__/
 *.egg-info/
 wheels/
 *.egg
+*.pkl
 
 # Virtual environments
 .venv/

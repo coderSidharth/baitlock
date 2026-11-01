@@ -14,22 +14,23 @@ def get_fraud_model():
 
     # Synthetic normal transactions
     # [amount, velocity (tx/hr), hour_of_day, geo_distance_km]
+    rng = np.random.RandomState(42)  # Seed for reproducible training data
     X_train = []
     
     # Normal behavior (bulk of data)
     for _ in range(500):
-        amount = np.random.normal(50, 20) # $50 average
-        velocity = np.random.poisson(1) # 1 tx per hour
-        hour = np.random.randint(6, 23) # Daytime
-        geo = np.random.exponential(10) # close by
+        amount = rng.normal(50, 20) # $50 average
+        velocity = rng.poisson(1) # 1 tx per hour
+        hour = rng.randint(6, 23) # Daytime
+        geo = rng.exponential(10) # close by
         X_train.append([max(0, amount), velocity, hour, geo])
         
     # Introduce some anomalies (fraudulent behavior)
     for _ in range(20):
-        amount = np.random.uniform(500, 5000) # high amount
-        velocity = np.random.poisson(10) # high velocity
-        hour = np.random.randint(0, 5) # night time
-        geo = np.random.uniform(500, 5000) # far away
+        amount = rng.uniform(500, 5000) # high amount
+        velocity = rng.poisson(10) # high velocity
+        hour = rng.randint(0, 5) # night time
+        geo = rng.uniform(500, 5000) # far away
         X_train.append([amount, velocity, hour, geo])
         
     # contamination = expected % of anomalies
@@ -69,7 +70,7 @@ def predict_transaction_fraud(amount: float, velocity: int, hour: int, geo_dista
         reasons.append("Unusually high transaction amount")
     if velocity > 5:
         reasons.append("High transaction velocity (multiple transactions in short timeframe)")
-    if hour < 5 or hour > 23:
+    if hour < 5 or hour >= 23:
         reasons.append("Transaction occurred at an unusual hour")
     if geo_distance > 100:
         reasons.append("Device location is far from usual billing/shipping area")

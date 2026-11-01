@@ -12,6 +12,7 @@ router = APIRouter()
 
 @router.post("/register", response_model=schemas.UserOut)
 def register(user_in: schemas.UserCreate, db: Session = Depends(deps.get_db)):
+    user_in.email = user_in.email.lower()
     user = db.query(models.User).filter(models.User.email == user_in.email).first()
     if user:
         raise HTTPException(
@@ -59,6 +60,7 @@ async def login(request: Request, db: Session = Depends(deps.get_db)):
             detail="Email and password are required",
         )
 
+    username = username.strip().lower()
     user = db.query(models.User).filter(models.User.email == username).first()
     if not user or not verify_password(password, user.hashed_password):
         raise HTTPException(
@@ -89,6 +91,19 @@ def update_user_me(
     current_user: models.User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ):
+    # Require current_password for sensitive changes (password or email)
+    if user_in.password or (user_in.email and user_in.email != current_user.email):
+        if not user_in.current_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is required to change email or password"
+            )
+        if not verify_password(user_in.current_password, current_user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Incorrect current password"
+            )
+
     if user_in.email and user_in.email != current_user.email:
         existing = db.query(models.User).filter(models.User.email == user_in.email).first()
         if existing:
@@ -100,12 +115,6 @@ def update_user_me(
     if user_in.full_name is not None:
         current_user.full_name = user_in.full_name
     if user_in.password:
-        if user_in.current_password:
-            if not verify_password(user_in.current_password, current_user.hashed_password):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Incorrect current password"
-                )
         current_user.hashed_password = get_password_hash(user_in.password)
     db.commit()
     db.refresh(current_user)

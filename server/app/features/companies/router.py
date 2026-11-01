@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from urllib.parse import urlparse
 
 from app.api.deps import get_db, get_current_user
 from app.features.auth.models import User
 from app.features.companies import models, schemas
+from app.features.phishing.service import normalize_domain
 
 router = APIRouter()
 
@@ -14,17 +14,21 @@ def flag_company(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    try:
-        parsed_url = urlparse(payload.url)
-        domain = parsed_url.netloc or payload.url
-    except Exception:
-        domain = payload.url
-
-    # Normalize domain
-    domain = domain.lower().replace("www.", "")
+    # Use the same normalizer as the phishing service
+    domain = normalize_domain(payload.url)
 
     if payload.flag_type not in ["malicious", "legitimate"]:
         raise HTTPException(status_code=400, detail="Invalid flag type. Must be 'malicious' or 'legitimate'")
+
+    # Check if this user already flagged this domain with the same type
+    existing = db.query(models.CompanyFlag).filter(
+        models.CompanyFlag.user_id == current_user.id,
+        models.CompanyFlag.domain == domain,
+        models.CompanyFlag.flag_type == payload.flag_type
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=400, detail="You have already flagged this domain.")
 
     flag = models.CompanyFlag(
         domain=domain,

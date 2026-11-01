@@ -1,6 +1,9 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Index
 from app.core.database import Base
-from datetime import datetime
+from datetime import datetime, timezone
+
+def _utc_now():
+    return datetime.now(timezone.utc)
 
 class PhishingEvent(Base):
     __tablename__ = "phishing_events"
@@ -11,14 +14,14 @@ class PhishingEvent(Base):
     final_score = Column(Float)
     verdict = Column(String)
     reasons_jsonb = Column(String) 
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime(timezone=True), default=_utc_now, index=True)
 
 class UserWhitelist(Base):
     __tablename__ = "user_whitelists"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     domain = Column(String, index=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime(timezone=True), default=_utc_now, index=True)
 
     __table_args__ = (
         Index("ix_user_whitelist_user_domain", "user_id", "domain"),
@@ -29,7 +32,7 @@ class UserBlocklist(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     domain = Column(String, index=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime(timezone=True), default=_utc_now, index=True)
 
     __table_args__ = (
         Index("ix_user_blocklist_user_domain", "user_id", "domain"),

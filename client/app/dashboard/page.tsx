@@ -76,9 +76,9 @@ export default function DashboardPage() {
         body: JSON.stringify({
           transaction: {
             amount: parseFloat(fraudAmount) || 0,
-            velocity: parseInt(fraudVelocity, 10) || 1,
-            hour: parseInt(fraudHour, 10) || 12,
-            geo_distance: parseFloat(fraudGeoDistance) || 0
+            velocity: fraudVelocity !== "" ? parseInt(fraudVelocity, 10) : 1,
+            hour: fraudHour !== "" ? parseInt(fraudHour, 10) : 12,
+            geo_distance: fraudGeoDistance !== "" ? parseFloat(fraudGeoDistance) : 0
           }
         })
       });

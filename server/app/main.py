@@ -34,6 +34,5 @@ app.add_middleware(
 def home():
     return {"message": "Hello from Baitlock Backend"}
 
-# Include routers under /api/v1 prefix as well as root level for maximum compatibility
+# Include routers under /api/v1 prefix
 app.include_router(api_router, prefix="/api/v1")
-app.include_router(api_router)

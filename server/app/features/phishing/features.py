@@ -68,14 +68,17 @@ def extract_url_features(url: str) -> dict:
             embedded_brand = 1
             
         # Check for typosquatting on full domain and sub-tokens (e.g. paypa1.com or paypa1-security.com)
-        dist = jellyfish.levenshtein_distance(brand, registered_domain)
-        if dist < min_dist:
-            min_dist = dist
-        for part in re.split(r'[-_.]', registered_domain):
-            if len(part) >= 3:
-                part_dist = jellyfish.levenshtein_distance(brand, part)
-                if part_dist < min_dist:
-                    min_dist = part_dist
+        # Only check brands long enough for meaningful distance comparison
+        if len(brand) >= 5:
+            dist = jellyfish.levenshtein_distance(brand, registered_domain)
+            # Use length-normalized threshold: distance must be small relative to brand length
+            if dist < min_dist and dist <= max(2, len(brand) // 3):
+                min_dist = dist
+            for part in re.split(r'[-_.]', registered_domain):
+                if len(part) >= 4:
+                    part_dist = jellyfish.levenshtein_distance(brand, part)
+                    if part_dist < min_dist and part_dist <= max(2, len(brand) // 3):
+                        min_dist = part_dist
                     
     # Exact brand matches are not impersonations (score 100 = safe)
     if brand_match == 1:

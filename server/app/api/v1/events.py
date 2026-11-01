@@ -22,9 +22,12 @@ def list_events(
     events: List[Dict[str, Any]] = []
     
     if type is None or type == "phishing":
-        phishing_db = db.query(PhishingEvent).filter(
+        # Get total count for this user
+        phishing_query = db.query(PhishingEvent).filter(
             PhishingEvent.user_id == user.id
-        ).order_by(PhishingEvent.created_at.desc()).offset(offset).limit(limit).all()
+        ).order_by(PhishingEvent.created_at.desc())
+        
+        phishing_db = phishing_query.all()
         for e in phishing_db:
             try:
                 reasons = json.loads(e.reasons_jsonb) if e.reasons_jsonb else []
@@ -42,9 +45,11 @@ def list_events(
             })
             
     if type is None or type == "fraud":
-        fraud_db = db.query(FraudEvent).filter(
+        fraud_query = db.query(FraudEvent).filter(
             FraudEvent.user_id == user.id
-        ).order_by(FraudEvent.created_at.desc()).offset(offset).limit(limit).all()
+        ).order_by(FraudEvent.created_at.desc())
+        
+        fraud_db = fraud_query.all()
         for e in fraud_db:
             try:
                 reasons = json.loads(e.reasons_jsonb) if e.reasons_jsonb else []
@@ -64,10 +69,24 @@ def list_events(
     # Sort combined events by created_at descending
     events.sort(key=lambda x: x["created_at"], reverse=True)
     
-    # Paginate
+    # Get total BEFORE pagination
+    total = len(events)
+    
+    # Paginate only once (the DB queries already return all, we paginate the merged list)
     paginated_events = events[offset : offset + limit]
     
     return {
         "events": paginated_events,
-        "total": len(events)
+        "total": total
     }
+
+@router.delete("/events", status_code=204)
+def clear_events(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """Delete all events for the current user."""
+    db.query(PhishingEvent).filter(PhishingEvent.user_id == user.id).delete()
+    db.query(FraudEvent).filter(FraudEvent.user_id == user.id).delete()
+    db.commit()
+    return
