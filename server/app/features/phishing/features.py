@@ -1,8 +1,12 @@
 import math
 import re
+import os
 from urllib.parse import urlparse
 import jellyfish
 import tldextract
+
+# Configure tldextract cache to be in TMPDIR
+tld_extractor = tldextract.TLDExtract(cache_dir=os.environ.get('TMPDIR', '/tmp'))
 
 # Top targeted brands for quick Levenshtein matching and embedding detection
 TOP_BRANDS = [
@@ -52,7 +56,7 @@ def extract_url_features(url: str) -> dict:
     brand_match = 0 # 1 if legit exact match, 0 if not
     embedded_brand = 0 # 1 if brand is deceptively embedded
     
-    ext = tldextract.extract(normalized_url)
+    ext = tld_extractor(normalized_url)
     registered_domain = ext.domain.lower()  # e.g. "paypal" from "www.paypal.com"
     domain_lower = domain.lower()
 
@@ -87,5 +91,12 @@ def extract_url_features(url: str) -> dict:
         features['brand_impersonation_score'] = min_dist if min_dist != float('inf') else 100
     features['exact_brand_match'] = brand_match
     features['embedded_brand'] = embedded_brand
-    
+
+    # 5. TLD and structural signals the rule engine already checks
+    SUSPICIOUS_TLDS = {"xyz", "top", "tk", "pw", "club", "work", "click", "ga", "cf", "ml", "gq", "site", "online", "icu", "buzz", "vip"}
+    features['suspicious_tld'] = 1 if ext.suffix.lower().split(".")[-1] in SUSPICIOUS_TLDS else 0
+    features['has_punycode'] = 1 if "xn--" in domain else 0
+    features['num_subdomains'] = max(0, domain.count('.') - 1)  # subdomains beyond the registered domain
+    features['query_length'] = len(parsed.query)
+
     return features

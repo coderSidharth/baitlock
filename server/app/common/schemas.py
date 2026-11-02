@@ -49,7 +49,7 @@ class ScoreResult(BaseModel):
     def tier_matches_score(self) -> "ScoreResult":
         expected_tier = _score_to_tier(self.score)
         if self.tier != expected_tier:
-            pass
+            raise ValueError(f"tier '{self.tier}' does not match score {self.score} (expected '{expected_tier}')")
         return self
 
     model_config = {"frozen": True, "populate_by_name": True, "serialize_by_alias": True}

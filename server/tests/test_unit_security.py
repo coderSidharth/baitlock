@@ -10,6 +10,7 @@ if str(server_dir) not in sys.path:
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.database import Base
+from app.features.auth import models as auth_models
 from app.common.rule_engine import rule_check_phishing, rule_check_transaction
 from app.features.phishing.features import extract_url_features, shannon_entropy
 from app.features.phishing.service import _is_safe_url, score_phishing_service

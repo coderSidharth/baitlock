@@ -18,8 +18,8 @@ import csv
 import time
 import argparse
 import pickle
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -47,9 +47,11 @@ from app.features.phishing.phishing_ml import (
 def _extract_single(url: str):
     """Worker function for parallel extraction."""
     try:
-        feats = extract_url_features(url)
+        from app.features.phishing.features import extract_url_features as _ef
+        feats = _ef(url)
         return list(feats.values())
-    except Exception:
+    except Exception as e:
+        print(f"Extract error for {url}: {e}", flush=True)
         return None
 
 def normalize_label(val: str | int | float) -> int:
@@ -115,20 +117,33 @@ def load_from_csv(csv_path: Path, url_col: str | None, label_col: str | None, li
 
         print(f"[*] Mapping: URL='{header[url_idx]}' (col {url_idx}), Label='{header[label_idx]}' (col {label_idx})")
 
-        count = 0
-        for row in reader:
-            if not row or len(row) <= max(url_idx, label_idx):
-                continue
-            raw_url = row[url_idx].strip()
-            raw_label = row[label_idx].strip()
-            if not raw_url:
-                continue
-
-            urls.append(raw_url)
-            labels.append(normalize_label(raw_label))
-            count += 1
-            if limit and count >= limit:
-                break
+        if limit:
+            target_per_class = limit // 2
+            counts = {0: 0, 1: 0}
+            for row in reader:
+                if not row or len(row) <= max(url_idx, label_idx):
+                    continue
+                raw_url = row[url_idx].strip()
+                raw_label = row[label_idx].strip()
+                if not raw_url:
+                    continue
+                lbl = normalize_label(raw_label)
+                if counts[lbl] < target_per_class:
+                    urls.append(raw_url)
+                    labels.append(lbl)
+                    counts[lbl] += 1
+                if counts[0] >= target_per_class and counts[1] >= target_per_class:
+                    break
+        else:
+            for row in reader:
+                if not row or len(row) <= max(url_idx, label_idx):
+                    continue
+                raw_url = row[url_idx].strip()
+                raw_label = row[label_idx].strip()
+                if not raw_url:
+                    continue
+                urls.append(raw_url)
+                labels.append(normalize_label(raw_label))
 
     print(f"[*] Loaded {len(urls)} samples ({sum(labels)} phishing, {len(labels) - sum(labels)} benign).")
     return urls, labels
@@ -180,14 +195,14 @@ def load_builtin_dataset():
 
     return urls, labels
 
-def train_pipeline(urls, labels, n_estimators=100, max_depth=12, output_path=MODEL_PATH):
+def train_pipeline(urls, labels, n_estimators=100, max_depth=24, output_path=MODEL_PATH):
     """Extracts features, trains RandomForest, evaluates, and exports model."""
     start_time = time.time()
     total = len(urls)
     print(f"[*] Extracting 14 lexical and structural features for {total} URLs...")
 
-    # Parallel feature extraction
-    with ProcessPoolExecutor() as executor:
+    # Parallel feature extraction (ProcessPoolExecutor blocked in sandbox, use ThreadPoolExecutor)
+    with ThreadPoolExecutor() as executor:
         feature_rows = list(executor.map(_extract_single, urls, chunksize=max(1, total // (os.cpu_count() or 4))))
 
     # Filter out failed rows
@@ -204,15 +219,19 @@ def train_pipeline(urls, labels, n_estimators=100, max_depth=12, output_path=MOD
     extract_elapsed = time.time() - start_time
     print(f"[✓] Feature extraction completed in {extract_elapsed:.2f}s ({len(X)} valid samples).")
 
-    # Split train/test
+    # Split train/test (only stratify if both classes have > 1 sample)
+    classes, counts = np.unique(y, return_counts=True)
+    stratify = y if len(classes) > 1 and min(counts) > 1 else None
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.25, random_state=42, stratify=y
+        X, y, test_size=0.25, random_state=42, stratify=stratify
     )
 
     print(f"[*] Training RandomForestClassifier (n_estimators={n_estimators}, max_depth={max_depth})...")
     clf = RandomForestClassifier(
         n_estimators=n_estimators,
         max_depth=max_depth,
+        min_samples_leaf=4,
+        class_weight="balanced",
         random_state=42,
         n_jobs=-1
     )
@@ -220,14 +239,15 @@ def train_pipeline(urls, labels, n_estimators=100, max_depth=12, output_path=MOD
 
     # Evaluate
     y_pred = clf.predict(X_test)
-    y_proba = clf.predict_proba(X_test)[:, 1] if hasattr(clf, "predict_proba") else y_pred
+    proba = clf.predict_proba(X_test) if hasattr(clf, "predict_proba") else None
+    y_proba = proba[:, 1] if proba is not None and proba.shape[1] > 1 else y_pred
 
     acc = accuracy_score(y_test, y_pred)
     prec = precision_score(y_test, y_pred, zero_division=0)
     rec = recall_score(y_test, y_pred, zero_division=0)
     f1 = f1_score(y_test, y_pred, zero_division=0)
-    roc = roc_auc_score(y_test, y_proba)
-    cm = confusion_matrix(y_test, y_pred)
+    roc = roc_auc_score(y_test, y_proba) if len(classes) > 1 and len(np.unique(y_test)) > 1 else 0.0
+    cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
 
     print("\n" + "=" * 55)
     print("        BAITLOCK ML MODEL EVALUATION RESULTS        ")
@@ -261,7 +281,7 @@ def main():
     parser.add_argument("--label-col", type=str, default=None, help="Name of Label column in CSV (auto-detected if omitted)")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of samples loaded from CSV")
     parser.add_argument("--estimators", type=int, default=100, help="Number of trees in RandomForest (default: 100)")
-    parser.add_argument("--max-depth", type=int, default=12, help="Max depth of trees (default: 12)")
+    parser.add_argument("--max-depth", type=int, default=24, help="Max depth of trees (default: 24)")
     parser.add_argument("--output", type=str, default=str(MODEL_PATH), help="Destination path for .pkl model")
 
     args = parser.parse_args()

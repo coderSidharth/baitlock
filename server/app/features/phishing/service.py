@@ -9,6 +9,9 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 import requests
 import re
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def normalize_domain(value: str) -> str:
     candidate = value.strip()
@@ -22,31 +25,37 @@ def strip_tags(html: str) -> str:
 import ipaddress
 import socket
 
-def _is_safe_url(url: str) -> bool:
-    """Reject URLs that would cause SSRF (internal IPs, non-http schemes, metadata endpoints)."""
+def _resolve_safe_ip(url: str) -> str | None:
+    """Resolve hostname and reject SSRF (private/reserved IPs). Returns IP string or None."""
     try:
         parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https"):
-            return False
-        hostname = parsed.hostname
-        if not hostname:
-            return False
-        # Resolve the hostname and check if it's a private/reserved IP
-        resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return None
+        resolved = socket.getaddrinfo(parsed.hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
         for _, _, _, _, sockaddr in resolved:
             ip = ipaddress.ip_address(sockaddr[0])
             if ip.is_private or ip.is_reserved or ip.is_loopback or ip.is_link_local:
-                return False
-        return True
+                return None
+        return resolved[0][4][0]
     except Exception:
-        return False
+        return None
+
+def _is_safe_url(url: str) -> bool:
+    """Reject URLs that would cause SSRF (internal IPs, non-http schemes, metadata endpoints)."""
+    return _resolve_safe_ip(url) is not None
 
 def fetch_page_content(url: str) -> str:
-    if not _is_safe_url(url):
+    resolved_ip = _resolve_safe_ip(url)
+    if not resolved_ip:
         return ""
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, headers=headers, timeout=5, allow_redirects=False)
+        # Use the resolved IP to prevent DNS rebinding between check and fetch
+        parsed = urlparse(url)
+        formatted_ip = f"[{resolved_ip}]" if ":" in resolved_ip else resolved_ip
+        netloc = f"{formatted_ip}:{parsed.port}" if parsed.port else formatted_ip
+        ip_url = parsed._replace(netloc=netloc).geturl()
+        headers = {"User-Agent": "Mozilla/5.0", "Host": parsed.hostname}
+        res = requests.get(ip_url, headers=headers, timeout=5, allow_redirects=False, verify=False)
         res.raise_for_status()
         return strip_tags(res.text)[:3000]
     except Exception as e:
@@ -54,18 +63,21 @@ def fetch_page_content(url: str) -> str:
         return ""
 
 
+def _domain_candidates(domain: str) -> list[str]:
+    """Return the domain and all parent domains for override matching."""
+    parts = domain.split(".")
+    return [".".join(parts[i:]) for i in range(len(parts) - 1)]
+
+
 def score_phishing_service(db: Session, url: str, text_content: str = None, user_id: int = None, fast_mode: bool = False) -> dict:
     domain = normalize_domain(url)
+    candidates = _domain_candidates(domain)
     if user_id:
         # Check BLOCKLIST first (takes priority over everything)
-        blocklist_entries = db.query(UserBlocklist).filter(
-            UserBlocklist.user_id == user_id
-        ).all()
-        
-        blocklist_match = any(
-            domain == b.domain or domain.endswith("." + b.domain)
-            for b in blocklist_entries
-        )
+        blocklist_match = db.query(UserBlocklist).filter(
+            UserBlocklist.user_id == user_id,
+            UserBlocklist.domain.in_(candidates)
+        ).first() is not None
         
         if blocklist_match:
             result = {
@@ -79,14 +91,10 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
             return result
         
         # Then check whitelist
-        whitelist_entries = db.query(UserWhitelist).filter(
-            UserWhitelist.user_id == user_id
-        ).all()
-        
-        whitelist_match = any(
-            domain == w.domain or domain.endswith("." + w.domain)
-            for w in whitelist_entries
-        )
+        whitelist_match = db.query(UserWhitelist).filter(
+            UserWhitelist.user_id == user_id,
+            UserWhitelist.domain.in_(candidates)
+        ).first() is not None
         
         if whitelist_match:
             result = {
@@ -101,13 +109,14 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
             
     # Check Cache only for fast background scans
     if fast_mode:
-        # Match by domain (not full URL) since query strings are stripped on storage
-        cache_query = db.query(PhishingEvent).filter(
-            PhishingEvent.input_url.contains(domain),
+        # Match cached events whose extracted domain matches exactly
+        cached_event = db.query(PhishingEvent).filter(
             PhishingEvent.user_id == user_id,
             PhishingEvent.created_at >= datetime.now(timezone.utc) - timedelta(hours=12)
-        )
-        cached_event = cache_query.order_by(PhishingEvent.created_at.desc()).first()
+        ).filter(
+            # Exact domain match: URL must contain "://domain/" or "://domain" at end
+            PhishingEvent.input_url.like(f"%://{domain}%")
+        ).order_by(PhishingEvent.created_at.desc()).first()
     
         if cached_event:
             reasons = []
@@ -162,6 +171,10 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
         llm_res["llm_score"] = llm_analysis.get("llm_score")
         if llm_analysis.get("llm_reason"):
              llm_res["llm_reasons"] = [llm_analysis["llm_reason"]]
+        # Guard against prompt injection whitewashing: if ML flagged high risk, don't allow LLM to override to safe
+        if ml_res["ml_score"] < 40 and llm_res["llm_score"] is not None and llm_res["llm_score"] > 60:
+            llm_res["llm_score"] = min(llm_res["llm_score"], ml_res["ml_score"] + 20)
+            llm_res["llm_reasons"].append("LLM score capped due to conflicting high-risk ML indicators.")
         # Use a purely weighted score to prevent LLM false positives (e.g., security blogs) from completely overriding the ML
         if llm_res["llm_score"] is None:
             final_score = base_score
@@ -176,11 +189,10 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
         final_score = base_score
         
     raw_reasons = rule_res["rule_reasons"] + ml_res["ml_reasons"] + llm_res.get("llm_reasons", [])
-    all_reasons = [r for r in raw_reasons if "API error" not in r and "Not enough text" not in r]
+    all_reasons = [r for r in raw_reasons if not any(ign in r for ign in ("API error", "Not enough text", "temporarily unavailable", "temporarily deferred"))]
     
     # Check community flags from CompanyFlag (require ≥3 distinct users for penalties)
     from app.features.companies.models import CompanyFlag
-    from sqlalchemy import func as sa_func
     community_flags = db.query(CompanyFlag).filter(CompanyFlag.domain == domain).all()
     if community_flags:
         # Count distinct users per flag type
