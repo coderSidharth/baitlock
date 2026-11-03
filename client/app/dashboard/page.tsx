@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { ShieldAlert, CheckCircle, Ban, Trash2, Download, CreditCard, X, Play, RefreshCw, Zap } from "lucide-react";
+import { ShieldAlert, CheckCircle, Ban, Trash2, Download, CreditCard, X, RefreshCw, Zap } from "lucide-react";
 import { API_V1_URL } from "@/lib/api";
 
 export default function DashboardPage() {
@@ -30,7 +30,7 @@ export default function DashboardPage() {
     }
     const token = localStorage.getItem('access_token');
     const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
-    
+
     fetch(url, { headers })
       .then(res => res.ok ? res.json() : null)
       .then(data => {
@@ -128,58 +128,55 @@ export default function DashboardPage() {
 
   return (
     <>
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 md:mb-10">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 md:mb-8 gap-4">
         <div>
-          <h2 className="font-cormorant text-[48px] md:text-[64px] leading-14.5 md:leading-19.5 font-bold tracking-tight mb-1">Threat Matrix</h2>
-          <p className="text-white/60 font-inter text-sm">Real-time behavioral telemetry, phishing signals, and fraud detection.</p>
+          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight mb-1">Threat Matrix</h1>
+          <p className="text-muted-foreground text-sm">Real-time behavioral telemetry, phishing signals, and fraud detection.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
-          <button 
+        <div className="flex flex-wrap items-center gap-2">
+          <button
             onClick={() => { setShowFraudModal(true); setFraudResult(null); }}
-            className="flex items-center gap-2 px-4 py-2 rounded-md bg-linear-to-r from-[#0048A6] to-[#00214D] text-white font-inter text-sm font-medium hover:brightness-125 transition-all border border-[#0055c4]/50 shadow-[0_0_15px_rgba(0,72,166,0.5)] cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-lg btn-primary text-sm font-medium cursor-pointer"
           >
-            <CreditCard className="w-4 h-4 text-cyan-300" />
+            <CreditCard className="w-4 h-4" />
             Simulate Fraud Txn
           </button>
           {!showLogs ? (
-            <button onClick={() => setShowLogs(true)} className="flex items-center gap-2 px-4 py-2 rounded-md bg-linear-to-r from-[#003882] to-[#0048A6] text-white font-inter text-sm font-medium hover:brightness-110 transition-all border border-white/10 shadow-[0_0_12px_rgba(0,30,100,0.4)] cursor-pointer">
+            <button onClick={() => setShowLogs(true)} className="flex items-center gap-2 px-3.5 py-2 rounded-lg btn-secondary text-sm font-medium cursor-pointer">
               Restore logs
             </button>
           ) : (
-            <button onClick={handleClearLogs} className="flex items-center gap-2 px-4 py-2 rounded-md bg-linear-to-b from-[#2a1010]/80 to-[#1a0808]/80 text-red-400 font-inter text-sm font-medium hover:text-red-300 hover:brightness-110 transition-all border border-red-500/20 cursor-pointer">
+            <button onClick={handleClearLogs} className="flex items-center gap-2 px-3.5 py-2 rounded-lg btn-secondary text-sm font-medium text-destructive hover:text-destructive cursor-pointer">
               <Trash2 className="w-4 h-4" />
               Clear logs
             </button>
           )}
-          <button onClick={handleExportLogs} className="flex items-center gap-2 px-4 py-2 rounded-md bg-linear-to-b from-[#1C1F2B]/80 to-[#12141A]/80 text-white font-inter text-sm font-medium hover:brightness-110 transition-all border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] cursor-pointer">
+          <button onClick={handleExportLogs} className="flex items-center gap-2 px-3.5 py-2 rounded-lg btn-secondary text-sm font-medium cursor-pointer">
             <Download className="w-4 h-4" />
             Export logs
           </button>
         </div>
       </header>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 min-h-0 overflow-y-auto custom-scrollbar pb-10">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-0 overflow-y-auto custom-scrollbar pb-10">
         {/* Left Column */}
-        <div className="lg:col-span-4 2xl:col-span-3 flex flex-col gap-6">
+        <div className="lg:col-span-4 2xl:col-span-3 flex flex-col gap-5">
 
-          {/* Pipeline Health */}
-          <div className="grow surface-panel surface-panel-sheen p-6 flex flex-col relative overflow-hidden group">
-            <h3 className="font-medium text-[24px] leading-7.5 tracking-tight relative z-10">Avg Security<br />Score</h3>
-            <div className="my-auto relative z-10 flex flex-col items-center w-full mt-4">
-              <div className="font-cormorant text-[42px] leading-10.5 font-bold">{averageScore}%</div>
-              <div className="h-3 w-full rounded-[9px] bg-linear-to-r from-[#414141] to-[#1E2022] relative overflow-hidden mt-4 shadow-inner">
-                <div className="h-full bg-linear-to-r from-[#0048A6] to-[#001C40] rounded-[9px] transition-all duration-1000 ease-out relative" style={{ width: `${averageScore}%` }}>
-                  <div className="absolute inset-0 bg-white/20 w-1/2 blur-sm skew-x-12 translate-x-full animate-shine" />
-                </div>
+          {/* Avg Security Score */}
+          <div className="surface-panel p-6 flex flex-col">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Avg Security Score</h3>
+            <div className="mt-4 flex flex-col">
+              <div className="text-4xl font-semibold tracking-tight">{averageScore}<span className="text-xl text-muted-foreground">%</span></div>
+              <div className="h-2 w-full rounded-full bg-muted overflow-hidden mt-4">
+                <div className="h-full bg-primary rounded-full transition-all duration-700 ease-out" style={{ width: `${averageScore}%` }} />
               </div>
             </div>
-            <div className="absolute -top-10 -right-10 w-24 h-24 bg-[#0048A6]/20 blur-2xl rounded-full" />
           </div>
 
           {/* Module Status */}
-          <div className="grow surface-panel p-6 relative overflow-hidden group flex flex-col">
-            <h3 className="font-medium text-[24px] leading-7.5 tracking-tight relative z-10 mb-4">Module<br />Status</h3>
-            <div className="my-auto flex flex-col gap-3 z-10 w-full">
+          <div className="surface-panel p-6 flex flex-col">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Module Status</h3>
+            <div className="flex flex-col gap-2 w-full">
               <StatusItem label="Ingestion" status={events.length > 0 ? "ok" : "warning"} />
               <StatusItem label="LLM Analysis" status={llmStatus} />
               <StatusItem label="Db Sync" status={dbStatus} />
@@ -187,12 +184,12 @@ export default function DashboardPage() {
           </div>
 
           {/* Blocked Sites */}
-          <div className="surface-panel p-5 relative overflow-hidden flex flex-col gap-3">
-            <h3 className="font-medium text-[18px] leading-5.5 tracking-tight relative z-10 flex items-center gap-2 mb-2">
-              <Ban className="w-5 h-5 text-red-400" />
+          <div className="surface-panel p-5 flex flex-col gap-3">
+            <h3 className="text-sm font-medium flex items-center gap-2 mb-1">
+              <Ban className="w-4 h-4 text-destructive" />
               Blocked Sites
             </h3>
-            <div className="flex flex-col gap-2 z-10 w-full">
+            <div className="flex flex-col gap-2 w-full">
               {events
                 .filter(e => e.tier === "high" || e.tier === "critical")
                 .slice(0, 3)
@@ -200,50 +197,47 @@ export default function DashboardPage() {
                   <BlockedSite key={event.id} domain={event.target} reason={event.type.toUpperCase()} />
               ))}
               {events.filter(e => e.tier === "high" || e.tier === "critical").length === 0 && (
-                <div className="text-white/40 text-[13px] font-inter italic py-2 text-center">No blocks recently</div>
+                <div className="text-muted-foreground text-[13px] py-2 text-center">No blocks recently</div>
               )}
             </div>
           </div>
         </div>
 
         {/* Middle Column - AI Forecast */}
-        <div className="lg:col-span-8 2xl:col-span-5 surface-panel p-5 lg:p-8 flex flex-col min-h-100 max-h-200">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 shrink-0">
-            <h3 className="font-cormorant font-bold text-[28px] leading-8.5 tracking-tight">AI Forecast</h3>
-            <div className="flex flex-wrap gap-4 sm:gap-2">
-              <div className="relative flex justify-center">
-                <button onClick={() => setFilterType('All')} className={`px-3 transition-colors text-[18px] sm:text-[20px] leading-6 relative z-10 ${filterType === 'All' ? 'text-white' : 'text-white/50 hover:text-white'}`}>All</button>
-                {filterType === 'All' && <div className="absolute -bottom-2 w-full h-0.5 bg-white rounded shadow-[0_0_8px_white]"></div>}
-              </div>
-              <div className="relative flex justify-center">
-                <button onClick={() => setFilterType('Phishing')} className={`px-3 transition-colors text-[18px] sm:text-[20px] leading-6 relative z-10 ${filterType === 'Phishing' ? 'text-white' : 'text-white/50 hover:text-white'}`}>Phishing</button>
-                {filterType === 'Phishing' && <div className="absolute -bottom-2 w-full h-0.5 bg-white rounded shadow-[0_0_8px_white]"></div>}
-              </div>
-              <div className="relative flex justify-center">
-                <button onClick={() => setFilterType('Fraud')} className={`px-3 transition-colors text-[18px] sm:text-[20px] leading-6 relative z-10 ${filterType === 'Fraud' ? 'text-white' : 'text-white/50 hover:text-white'}`}>Fraud</button>
-                {filterType === 'Fraud' && <div className="absolute -bottom-2 w-full h-0.5 bg-white rounded shadow-[0_0_8px_white]"></div>}
-              </div>
+        <div className="lg:col-span-8 2xl:col-span-5 surface-panel p-5 lg:p-6 flex flex-col min-h-100 max-h-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0">
+            <h3 className="text-lg font-semibold tracking-tight">AI Forecast</h3>
+            <div className="inline-flex p-1 rounded-lg bg-muted border border-border self-start">
+              {['All', 'Phishing', 'Fraud'].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilterType(f)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${filterType === f ? 'bg-card text-foreground border border-border shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  {f}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="flex flex-col gap-6 overflow-y-auto pr-3 -mr-3 custom-scrollbar flex-1">
+          <div className="flex flex-col gap-4 overflow-y-auto pr-2 -mr-2 custom-scrollbar flex-1">
             {showLogs ? (
               filteredEvents.length > 0 ? filteredEvents.map(evt => (
-                <FeedCard 
+                <FeedCard
                   key={evt.id}
-                  label={evt.type === 'phishing' ? 'URL Scan' : 'Txn Fraud'} 
-                  domain={evt.target} 
-                  score={evt.score} 
-                  tags={evt.reasons || [evt.verdict]} 
-                  type={evt.type} 
+                  label={evt.type === 'phishing' ? 'URL Scan' : 'Txn Fraud'}
+                  domain={evt.target}
+                  score={evt.score}
+                  tags={evt.reasons || [evt.verdict]}
+                  type={evt.type}
                 />
               )) : (
-                <div className="flex-1 flex items-center justify-center text-white/30 font-inter text-lg h-32">
+                <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm h-32">
                   No events recorded yet.
                 </div>
               )
             ) : (
-              <div className="flex-1 flex items-center justify-center text-white/30 font-inter text-lg h-32">
+              <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm h-32">
                 Logs cleared. Click &quot;Restore logs&quot; to view again.
               </div>
             )}
@@ -251,47 +245,47 @@ export default function DashboardPage() {
         </div>
 
         {/* Right Column - AI Insight */}
-        <div className="lg:col-span-12 2xl:col-span-4 surface-panel p-5 lg:p-8 flex flex-col">
-          <h3 className="font-cormorant font-bold text-[28px] leading-8.5 tracking-tight mb-8">AI Insight</h3>
-          <div className="flex-1 flex flex-col gap-6 relative">
+        <div className="lg:col-span-12 2xl:col-span-4 surface-panel p-5 lg:p-6 flex flex-col">
+          <h3 className="text-lg font-semibold tracking-tight mb-6">AI Insight</h3>
+          <div className="flex-1 flex flex-col gap-6">
             {showLogs ? (
-              <div className="font-inter space-y-6 text-white leading-relaxed text-lg">
+              <div className="space-y-5 text-[15px] leading-relaxed text-foreground">
                 {criticalEvents.length > 0 ? (
                   <>
-                    <p>The neural model has intercepted <strong>{criticalEvents.length} severe threat(s)</strong> recently, including highly suspicious activity originating from <span className="text-red-400 font-mono text-[15px] break-all border border-red-500/20 bg-red-500/10 px-1.5 py-0.5 rounded block sm:inline mt-1 sm:mt-0">{criticalEvents[0].target}</span>.</p>
-                    <div className="p-5 sm:p-6 rounded-[9px] border border-white/20 bg-[#1E2022]/40 backdrop-blur-md shadow-lg shadow-black/20">
-                      <h4 className="text-white font-medium mb-3 flex items-center gap-2 text-lg sm:text-xl">
-                        <ShieldAlert className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 shrink-0" />
+                    <p>The neural model has intercepted <strong>{criticalEvents.length} severe threat(s)</strong> recently, including highly suspicious activity originating from <span className="text-destructive font-mono text-[13px] break-all bg-destructive/10 border border-destructive/20 px-1.5 py-0.5 rounded inline-block mt-1">{criticalEvents[0].target}</span>.</p>
+                    <div className="p-5 rounded-lg border border-border bg-muted/40">
+                      <h4 className="font-medium mb-2 flex items-center gap-2 text-[15px]">
+                        <ShieldAlert className="w-5 h-5 text-warning shrink-0" />
                         Recommended Action
                       </h4>
-                      <p className="text-sm sm:text-base text-white/80">Avoid interacting with <strong className="break-all">{criticalEvents[0].target}</strong>. We recommend navigating to your Blocklist to ensure this domain is permanently restricted from your network.</p>
+                      <p className="text-sm text-muted-foreground">Avoid interacting with <strong className="break-all text-foreground">{criticalEvents[0].target}</strong>. We recommend navigating to your Blocklist to ensure this domain is permanently restricted from your network.</p>
                     </div>
                   </>
                 ) : (
                   <>
                     <p>Your network traffic is currently <strong>clean and stable</strong>. No critical threats have been detected in recent sessions.</p>
-                    <div className="p-5 sm:p-6 rounded-[9px] border border-white/20 bg-[#1E2022]/40 backdrop-blur-md shadow-lg shadow-black/20">
-                      <h4 className="text-white font-medium mb-3 flex items-center gap-2 text-lg sm:text-xl">
-                        <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-400 shrink-0" />
+                    <div className="p-5 rounded-lg border border-border bg-muted/40">
+                      <h4 className="font-medium mb-2 flex items-center gap-2 text-[15px]">
+                        <CheckCircle className="w-5 h-5 text-success shrink-0" />
                         All Clear
                       </h4>
-                      <p className="text-sm sm:text-base text-white/80">Continue normal browsing. The AI shield remains active in the background to automatically intercept anomalies.</p>
+                      <p className="text-sm text-muted-foreground">Continue normal browsing. The AI shield remains active in the background to automatically intercept anomalies.</p>
                     </div>
                   </>
                 )}
               </div>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-white/30 font-inter text-lg">
+              <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
                 Insights cleared.
               </div>
             )}
-            <div className="mt-8 bg-[#001C40]/50 p-5 sm:p-6 rounded-[9px] border border-[#0048A6]/30">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3 sm:mb-2">
-                <span className="font-mono text-sm text-white/60">System Integrity</span>
-                <span className="font-mono text-xl text-green-400 font-bold">{Math.max(0, 100 - (criticalEvents.length * 2))}%</span>
+            <div className="mt-auto p-5 rounded-lg border border-border bg-muted/40">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-mono text-sm text-muted-foreground">System Integrity</span>
+                <span className="font-mono text-lg text-success font-semibold">{Math.max(0, 100 - (criticalEvents.length * 2))}%</span>
               </div>
-              <div className="h-1.5 w-full bg-[#1E2022] rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 rounded-full shadow-[0_0_10px_#22c55e] transition-all duration-1000" style={{ width: `${Math.max(0, 100 - (criticalEvents.length * 2))}%` }} />
+              <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-success rounded-full transition-all duration-700" style={{ width: `${Math.max(0, 100 - (criticalEvents.length * 2))}%` }} />
               </div>
             </div>
           </div>
@@ -300,54 +294,55 @@ export default function DashboardPage() {
 
       {/* Fraud Simulation Modal */}
       {showFraudModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-2xl surface-panel surface-panel-sheen p-6 md:p-8 overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+          <div className="relative w-full max-w-2xl surface-panel p-6 md:p-7 overflow-hidden max-h-[90vh] flex flex-col shadow-xl">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-border shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-[#0048A6]/20 border border-[#0048A6]/40">
-                  <CreditCard className="w-6 h-6 text-cyan-400" />
+                <div className="p-2 rounded-lg bg-muted border border-border">
+                  <CreditCard className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-cormorant font-bold text-2xl text-white">Transaction Fraud Simulator</h3>
-                  <p className="text-white/50 font-inter text-xs">Simulate transaction parameters to test Layer 1 rules & Layer 2 ML anomaly detection.</p>
+                  <h3 className="text-lg font-semibold">Transaction Fraud Simulator</h3>
+                  <p className="text-muted-foreground text-xs">Simulate transaction parameters to test Layer 1 rules &amp; Layer 2 ML anomaly detection.</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setShowFraudModal(false)}
-                className="p-1 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
+                aria-label="Close"
+                className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="overflow-y-auto custom-scrollbar pr-2 flex-1 space-y-6">
+            <div className="overflow-y-auto custom-scrollbar pr-1 flex-1 space-y-6">
               {/* Presets */}
               <div>
-                <label className="block text-xs font-mono uppercase text-white/50 mb-2">Quick Presets</label>
+                <label className="block text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">Quick Presets</label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => applyPreset("15000", "18", "3", "3500")}
-                    className="p-2.5 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-left text-xs transition-colors cursor-pointer"
+                    className="p-2.5 rounded-lg border border-destructive/30 bg-destructive/5 hover:bg-destructive/10 text-left text-xs transition-colors cursor-pointer"
                   >
-                    <div className="font-bold text-red-400">Critical: Exceeds Limit</div>
-                    <div className="text-white/50 font-mono text-[10px] mt-0.5">$15k • 18 txns • 3 AM</div>
+                    <div className="font-semibold text-destructive">Critical: Exceeds Limit</div>
+                    <div className="text-muted-foreground font-mono text-[10px] mt-0.5">$15k • 18 txns • 3 AM</div>
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => applyPreset("350", "2", "23", "5500")}
-                    className="p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-left text-xs transition-colors cursor-pointer"
+                    className="p-2.5 rounded-lg border border-warning/30 bg-warning/5 hover:bg-warning/10 text-left text-xs transition-colors cursor-pointer"
                   >
-                    <div className="font-bold text-amber-300">High: Geo-Velocity</div>
-                    <div className="text-white/50 font-mono text-[10px] mt-0.5">$350 • 2 txns • 5,500 mi</div>
+                    <div className="font-semibold text-warning">High: Geo-Velocity</div>
+                    <div className="text-muted-foreground font-mono text-[10px] mt-0.5">$350 • 2 txns • 5,500 mi</div>
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => applyPreset("42.50", "1", "14", "8")}
-                    className="p-2.5 rounded-lg border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 text-left text-xs transition-colors cursor-pointer"
+                    className="p-2.5 rounded-lg border border-success/30 bg-success/5 hover:bg-success/10 text-left text-xs transition-colors cursor-pointer"
                   >
-                    <div className="font-bold text-green-400">Safe: Normal Purchase</div>
-                    <div className="text-white/50 font-mono text-[10px] mt-0.5">$42.50 • 1 txn • 8 mi</div>
+                    <div className="font-semibold text-success">Safe: Normal Purchase</div>
+                    <div className="text-muted-foreground font-mono text-[10px] mt-0.5">$42.50 • 1 txn • 8 mi</div>
                   </button>
                 </div>
               </div>
@@ -356,63 +351,63 @@ export default function DashboardPage() {
               <form onSubmit={handleSimulateFraud} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-white/70 mb-1">Transaction Amount ($)</label>
-                    <input 
-                      type="number" 
+                    <label className="block text-xs font-medium text-foreground mb-1.5">Transaction Amount ($)</label>
+                    <input
+                      type="number"
                       step="0.01"
-                      value={fraudAmount} 
+                      value={fraudAmount}
                       onChange={(e) => setFraudAmount(e.target.value)}
                       required
-                      className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none"
+                      className="w-full px-3 py-2 input-base font-mono text-sm"
                       placeholder="e.g. 150.00"
                     />
-                    <span className="text-[10px] text-white/40 block mt-0.5">Hard limit rule triggers above $10,000</span>
+                    <span className="text-[10px] text-muted-foreground block mt-1">Hard limit rule triggers above $10,000</span>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-white/70 mb-1">Velocity (txns in last hour)</label>
-                    <input 
-                      type="number" 
-                      value={fraudVelocity} 
+                    <label className="block text-xs font-medium text-foreground mb-1.5">Velocity (txns in last hour)</label>
+                    <input
+                      type="number"
+                      value={fraudVelocity}
                       onChange={(e) => setFraudVelocity(e.target.value)}
                       required
-                      className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none"
+                      className="w-full px-3 py-2 input-base font-mono text-sm"
                       placeholder="e.g. 2"
                     />
-                    <span className="text-[10px] text-white/40 block mt-0.5">Frequent attempts trigger velocity rules</span>
+                    <span className="text-[10px] text-muted-foreground block mt-1">Frequent attempts trigger velocity rules</span>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-white/70 mb-1">Hour of Day (0–23)</label>
-                    <input 
-                      type="number" 
+                    <label className="block text-xs font-medium text-foreground mb-1.5">Hour of Day (0–23)</label>
+                    <input
+                      type="number"
                       min="0"
                       max="23"
-                      value={fraudHour} 
+                      value={fraudHour}
                       onChange={(e) => setFraudHour(e.target.value)}
                       required
-                      className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none"
+                      className="w-full px-3 py-2 input-base font-mono text-sm"
                       placeholder="e.g. 14"
                     />
-                    <span className="text-[10px] text-white/40 block mt-0.5">Off-hours (2:00–4:00 AM) increase anomaly score</span>
+                    <span className="text-[10px] text-muted-foreground block mt-1">Off-hours (2:00–4:00 AM) increase anomaly score</span>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-white/70 mb-1">Geo Distance (miles from home)</label>
-                    <input 
-                      type="number" 
+                    <label className="block text-xs font-medium text-foreground mb-1.5">Geo Distance (miles from home)</label>
+                    <input
+                      type="number"
                       step="0.1"
-                      value={fraudGeoDistance} 
+                      value={fraudGeoDistance}
                       onChange={(e) => setFraudGeoDistance(e.target.value)}
                       required
-                      className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white font-mono text-sm focus:border-cyan-400 focus:outline-none"
+                      className="w-full px-3 py-2 input-base font-mono text-sm"
                       placeholder="e.g. 25.0"
                     />
-                    <span className="text-[10px] text-white/40 block mt-0.5">&gt; 5,000 miles triggers impossible travel</span>
+                    <span className="text-[10px] text-muted-foreground block mt-1">&gt; 5,000 miles triggers impossible travel</span>
                   </div>
                 </div>
 
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={fraudLoading}
-                  className="w-full py-2.5 rounded-lg bg-linear-to-r from-[#0048A6] to-[#00214D] hover:brightness-125 text-white font-inter text-sm font-semibold flex items-center justify-center gap-2 transition-all border border-cyan-500/30 shadow-[0_0_15px_rgba(0,150,255,0.3)] cursor-pointer disabled:opacity-50"
+                  className="w-full py-2.5 rounded-lg btn-primary text-sm font-medium flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {fraudLoading ? (
                     <>
@@ -421,7 +416,7 @@ export default function DashboardPage() {
                     </>
                   ) : (
                     <>
-                      <Zap className="w-4 h-4 text-cyan-300" />
+                      <Zap className="w-4 h-4" />
                       Evaluate Transaction Risk
                     </>
                   )}
@@ -430,45 +425,45 @@ export default function DashboardPage() {
 
               {/* Result Display */}
               {fraudResult && (
-                <div className="p-4 rounded-xl border border-white/15 bg-black/40 space-y-3 animate-fade-in">
+                <div className="p-4 rounded-lg border border-border bg-muted/40 space-y-3 animate-fade-in">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-xs uppercase font-mono text-white/50">Assessment Verdict</div>
-                      <div className="text-xl font-bold font-cormorant text-white flex items-center gap-2">
+                      <div className="text-xs uppercase font-medium text-muted-foreground">Assessment Verdict</div>
+                      <div className="text-lg font-semibold flex items-center gap-2">
                         {fraudResult.verdict}
-                        <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full font-bold border ${
-                          fraudResult.tier === 'critical' ? 'bg-red-500/20 text-red-400 border-red-500/40' :
-                          fraudResult.tier === 'high' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
-                          fraudResult.tier === 'moderate' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' :
-                          'bg-green-500/20 text-green-400 border-green-500/40'
+                        <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full font-semibold border ${
+                          fraudResult.tier === 'critical' ? 'bg-destructive/10 text-destructive border-destructive/30' :
+                          fraudResult.tier === 'high' ? 'bg-warning/10 text-warning border-warning/30' :
+                          fraudResult.tier === 'moderate' ? 'bg-warning/10 text-warning border-warning/30' :
+                          'bg-success/10 text-success border-success/30'
                         }`}>
                           {fraudResult.tier}
                         </span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs uppercase font-mono text-white/50">Security Score</div>
-                      <div className={`text-2xl font-mono font-bold ${
-                        fraudResult.final_score < 30 ? 'text-red-400' :
-                        fraudResult.final_score < 70 ? 'text-amber-300' : 'text-green-400'
+                      <div className="text-xs uppercase font-medium text-muted-foreground">Security Score</div>
+                      <div className={`text-2xl font-mono font-semibold ${
+                        fraudResult.final_score < 30 ? 'text-destructive' :
+                        fraudResult.final_score < 70 ? 'text-warning' : 'text-success'
                       }`}>
                         {fraudResult.final_score}/100
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-white/5 p-2 rounded-lg border border-white/5">
-                    <div>Rule Score: <span className="text-cyan-300 font-bold">{fraudResult.breakdown?.rule_score}/100</span></div>
-                    <div>ML Score: <span className="text-cyan-300 font-bold">{fraudResult.breakdown?.ml_score}/100</span></div>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-card p-2 rounded-lg border border-border">
+                    <div className="text-muted-foreground">Rule Score: <span className="text-foreground font-semibold">{fraudResult.breakdown?.rule_score}/100</span></div>
+                    <div className="text-muted-foreground">ML Score: <span className="text-foreground font-semibold">{fraudResult.breakdown?.ml_score}/100</span></div>
                   </div>
 
                   {fraudResult.reasons && fraudResult.reasons.length > 0 && (
                     <div>
-                      <div className="text-xs font-medium text-white/60 mb-1">Triggered Indicators:</div>
+                      <div className="text-xs font-medium text-muted-foreground mb-1.5">Triggered Indicators:</div>
                       <ul className="space-y-1">
                         {fraudResult.reasons.map((r: string, idx: number) => (
-                          <li key={idx} className="text-xs font-inter text-red-300/90 flex items-start gap-1.5">
-                            <span className="text-red-400 font-mono">•</span>
+                          <li key={idx} className="text-xs text-foreground flex items-start gap-1.5">
+                            <span className="text-destructive font-mono">•</span>
                             <span>{r}</span>
                           </li>
                         ))}
@@ -477,13 +472,13 @@ export default function DashboardPage() {
                   )}
 
                   <div className="pt-2 flex justify-end gap-2">
-                    <button 
+                    <button
                       type="button"
                       onClick={() => {
                         setFilterType('Fraud');
                         setShowFraudModal(false);
                       }}
-                      className="text-xs font-medium px-4 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                      className="text-xs font-medium px-4 py-1.5 rounded-lg btn-secondary cursor-pointer"
                     >
                       View in Threat Matrix
                     </button>
@@ -499,52 +494,60 @@ export default function DashboardPage() {
 }
 
 function StatusItem({ label, status }: { label: string, status: "ok" | "warning" | "error" }) {
-  const colors = {
-    ok: "text-green-400 border-green-500/20 bg-green-500/5",
-    warning: "text-amber-400 border-amber-500/20 bg-amber-500/5",
-    error: "text-red-400 border-red-500/20 bg-red-500/5",
+  const dot = {
+    ok: "bg-success",
+    warning: "bg-warning",
+    error: "bg-destructive",
+  };
+  const text = {
+    ok: "Operational",
+    warning: "Degraded",
+    error: "Offline",
   };
   return (
-    <div className={`flex items-center justify-between p-2.5 rounded-[9px] border backdrop-blur-sm ${colors[status]} shadow-lg transition-transform hover:scale-[1.02]`}>
-      <span className="font-medium text-[13px] text-white/90 font-inter tracking-wide">{label}</span>
-      <CheckCircle className="w-4 h-4 shadow-inner" />
+    <div className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-border bg-muted/40">
+      <span className="font-medium text-[13px] text-foreground">{label}</span>
+      <span className="flex items-center gap-2 text-[12px] text-muted-foreground">
+        {text[status]}
+        <span className={`w-2 h-2 rounded-full ${dot[status]}`} />
+      </span>
     </div>
   );
 }
 
 function BlockedSite({ domain, reason }: { domain: string, reason: string }) {
   return (
-    <div className="flex items-center justify-between p-2.5 rounded-md border border-red-500/15 bg-red-500/5 backdrop-blur-sm">
-      <span className="font-mono text-[13px] text-white/80 truncate">{domain}</span>
-      <span className="font-inter text-[11px] text-red-400 uppercase tracking-wider font-medium shrink-0 ml-2">{reason}</span>
+    <div className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-border bg-muted/40">
+      <span className="font-mono text-[13px] text-foreground truncate">{domain}</span>
+      <span className="text-[11px] text-destructive uppercase tracking-wider font-medium shrink-0 ml-2">{reason}</span>
     </div>
   );
 }
 
 function FeedCard({ label, domain, score, tags, type }: { label: string, domain: string, score: number, tags: string[], type: string }) {
   const accent = type === 'phishing'
-    ? { border: 'border-red-500/30', dot: 'bg-red-400', text: 'text-red-300' }
+    ? { dot: 'bg-destructive', tag: 'text-destructive' }
     : type === 'fraud'
-    ? { border: 'border-amber-500/30', dot: 'bg-amber-400', text: 'text-amber-300' }
-    : { border: 'border-white/8', dot: 'bg-emerald-400', text: 'text-emerald-300' };
+    ? { dot: 'bg-warning', tag: 'text-warning' }
+    : { dot: 'bg-success', tag: 'text-success' };
 
   return (
-    <div className={`surface-card hover-lift p-6 cursor-pointer group ${accent.border}`}>
-      <div className="flex justify-between items-start mb-4">
-        <h4 className="font-inter font-medium text-[20px] leading-6 text-white tracking-tight flex items-center gap-2.5">
-          <span className={`w-2 h-2 rounded-full ${accent.dot} shadow-[0_0_8px_currentColor]`} />
+    <div className="surface-card hover-lift p-5 cursor-pointer">
+      <div className="flex justify-between items-start mb-3">
+        <h4 className="font-medium text-base flex items-center gap-2.5">
+          <span className={`w-2 h-2 rounded-full ${accent.dot}`} />
           {label}
         </h4>
-      </div>
-      <div className="font-mono text-[14px] leading-5 tracking-tight text-white mb-6 underline decoration-white/20 underline-offset-4 group-hover:text-[#a5c7fc] group-hover:decoration-[#a5c7fc]/50 transition-colors break-all opacity-90">{domain}</div>
-      <div className="flex flex-wrap gap-2 items-center">
-        <div className="flex items-center bg-black/50 rounded-md border border-white/8 px-2.5 py-1 shadow-inner mr-2">
-          <span className="font-mono text-lg font-bold text-white mr-2">{score}</span>
-          <span className="text-[10px] text-white/60 font-inter uppercase tracking-widest leading-none mt-0.5">Score</span>
+        <div className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-0.5">
+          <span className="font-mono text-sm font-semibold text-foreground">{score}</span>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Score</span>
         </div>
+      </div>
+      <div className="font-mono text-[13px] text-foreground mb-4 break-all underline decoration-border underline-offset-4 hover:decoration-primary transition-colors">{domain}</div>
+      <div className="flex flex-wrap gap-2 items-center">
         {tags.map((tag, i) => (
-          <span key={i} className={`font-mono text-[13px] px-2 py-0.5 rounded-md bg-black/40 border border-white/10 ${accent.text} whitespace-nowrap`}>
-            [!] {tag}
+          <span key={i} className={`font-mono text-[12px] px-2 py-0.5 rounded-md bg-muted border border-border ${accent.tag}`}>
+            {tag}
           </span>
         ))}
       </div>

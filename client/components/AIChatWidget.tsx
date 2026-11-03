@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, Send, X, ShieldAlert, RotateCcw } from "lucide-react";
+import { MessageSquare, Send, X, Shield, RotateCcw } from "lucide-react";
 import MarkdownMessage from "./MarkdownMessage";
 import { API_V1_URL } from "@/lib/api";
 
@@ -17,8 +17,8 @@ export default function AIChatWidget() {
     const sanitizeContent = (text: string) => {
         if (!text) return text;
         if (
-            text.includes("Groq API error") || 
-            text.includes("Ollama local API error") || 
+            text.includes("Groq API error") ||
+            text.includes("Ollama local API error") ||
             text.includes("429 Client Error") ||
             text.includes("Too Many Requests") ||
             text.includes("LLM_PROVIDER")
@@ -97,7 +97,7 @@ export default function AIChatWidget() {
                 })
             });
             const data = await res.json().catch(() => ({}));
-            
+
             if (data.content) {
                 setChatMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: sanitizeContent(data.content) }]);
             } else {
@@ -115,38 +115,37 @@ export default function AIChatWidget() {
         <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
             {/* Chat Box */}
             {isOpen && (
-                <div
-                    className="mb-4 w-87.5 sm:w-100 h-125 max-h-[70vh] rounded-2xl shadow-[0_30px_70px_-20px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden border border-white/12 backdrop-blur-md transition-all duration-300 animate-fade-in opacity-100"
-                    style={{ background: "linear-gradient(180.03deg, #050d1d 5.53%, #0a2047 122.03%)" }}
-                >
+                <div className="mb-4 w-87.5 sm:w-100 h-125 max-h-[70vh] rounded-xl shadow-xl flex flex-col overflow-hidden border border-border bg-card animate-fade-in">
                     {/* Header */}
-                    <div className="p-4 bg-gradient-to-r from-blue-600/25 to-indigo-600/15 border-b border-white/10 flex justify-between items-center">
-                        <div className="flex items-center gap-2 text-white">
-                            <ShieldAlert size={18} className="text-blue-300" />
-                            <span className="font-cormorant font-bold text-xl tracking-wide">Baitlock AI</span>
-                        </div>
+                    <div className="p-4 border-b border-border flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                            <button 
-                                onClick={clearChatHistory} 
+                            <span className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
+                                <Shield size={15} className="text-primary-foreground" strokeWidth={2.2} />
+                            </span>
+                            <span className="font-semibold text-base tracking-tight">Baitlock AI</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={clearChatHistory}
                                 title="Reset / Clear Chat"
-                                className="text-white/40 hover:text-white/90 transition-colors p-1 rounded hover:bg-white/10 cursor-pointer"
+                                className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-accent cursor-pointer"
                             >
                                 <RotateCcw size={15} />
                             </button>
-                            <button onClick={() => setIsOpen(false)} className="text-white/50 hover:text-white transition-colors cursor-pointer">
-                                <X size={20} />
+                            <button onClick={() => setIsOpen(false)} aria-label="Close" className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-accent cursor-pointer">
+                                <X size={18} />
                             </button>
                         </div>
                     </div>
 
                     {/* Messages Area */}
-                    <div className="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+                    <div className="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-3">
                         {chatMessages.map((msg) => (
                             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[92%] p-3.5 rounded-2xl text-sm font-inter leading-relaxed shadow-lg ${
+                                <div className={`max-w-[92%] p-3 rounded-xl text-sm leading-relaxed ${
                                     msg.role === 'user'
-                                        ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-br-md shadow-[0_8px_20px_-10px_rgba(37,99,235,0.7)]'
-                                        : 'bg-white/8 text-white/95 border border-white/10 rounded-bl-md'
+                                        ? 'bg-primary text-primary-foreground rounded-br-sm'
+                                        : 'bg-muted text-foreground border border-border rounded-bl-sm'
                                 }`}>
                                     <MarkdownMessage content={msg.content} isUser={msg.role === 'user'} />
                                 </div>
@@ -154,10 +153,10 @@ export default function AIChatWidget() {
                         ))}
                         {loading && (
                             <div className="flex justify-start">
-                                <div className="max-w-[85%] p-3 rounded-[9px] rounded-bl-none bg-white/10 border border-white/5 text-blue-200 text-sm flex items-center gap-2">
+                                <div className="max-w-[85%] p-3 rounded-xl rounded-bl-sm bg-muted border border-border text-muted-foreground text-sm flex items-center gap-2">
                                     <span className="relative flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                                     </span>
                                     <span>Baitlock AI is analyzing...</span>
                                 </div>
@@ -167,44 +166,44 @@ export default function AIChatWidget() {
                     </div>
 
                     {/* Quick Suggestions */}
-                    <div className="px-3 py-1.5 bg-[#000D1F]/70 border-t border-white/5 flex gap-1.5 overflow-x-auto no-scrollbar">
+                    <div className="px-3 py-2 border-t border-border flex gap-1.5 overflow-x-auto no-scrollbar">
                         <button
                             type="button"
                             onClick={() => sendChatMessage("Add phishing-test.com to my blocklist")}
-                            className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 transition-colors cursor-pointer"
+                            className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/20 transition-colors cursor-pointer"
                         >
                             + Block Domain
                         </button>
                         <button
                             type="button"
                             onClick={() => sendChatMessage("Add safe-portal.org to my whitelist")}
-                            className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-green-500/10 hover:bg-green-500/20 text-green-300 border border-green-500/20 transition-colors cursor-pointer"
+                            className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-success/10 hover:bg-success/20 text-success border border-success/20 transition-colors cursor-pointer"
                         >
                             + Whitelist Domain
                         </button>
                         <button
                             type="button"
                             onClick={() => sendChatMessage("What is my current threat status?")}
-                            className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 transition-colors cursor-pointer"
+                            className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-muted hover:bg-accent text-muted-foreground border border-border transition-colors cursor-pointer"
                         >
                             Status Check
                         </button>
                     </div>
 
                     {/* Input Area */}
-                    <div className="p-3 bg-[#000D1F]/50 border-t border-white/10 flex gap-2">
-                        <input 
-                            type="text" 
-                            value={chatInput} 
-                            onChange={(e) => setChatInput(e.target.value)} 
+                    <div className="p-3 border-t border-border flex gap-2">
+                        <input
+                            type="text"
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
                             placeholder="Ask Baitlock..."
-                            className="flex-1 bg-black/40 border border-white/10 text-white placeholder-white/30 rounded-lg px-3 py-2 text-sm focus:outline-none input-ring"
+                            className="flex-1 input-base px-3 py-2 text-sm"
                         />
                         <button
                             onClick={() => sendChatMessage()}
                             disabled={loading || !chatInput.trim()}
-                            className="px-3 py-2 btn-primary disabled:opacity-50 text-white rounded-lg flex items-center justify-center cursor-pointer"
+                            className="px-3 py-2 btn-primary rounded-lg flex items-center justify-center cursor-pointer disabled:opacity-50"
                         >
                             <Send size={16} />
                         </button>
@@ -215,7 +214,8 @@ export default function AIChatWidget() {
             {/* Toggle Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 hover:brightness-110 text-white rounded-full flex items-center justify-center shadow-[0_10px_30px_-6px_rgba(37,99,235,0.6)] border border-white/20 transition-transform hover:scale-105 active:scale-95"
+                aria-label="Open Baitlock AI chat"
+                className="w-14 h-14 btn-primary rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95"
             >
                 {isOpen ? <X size={24} /> : <MessageSquare size={24} />}
             </button>

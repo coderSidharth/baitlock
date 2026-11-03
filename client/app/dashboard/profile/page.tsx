@@ -1,5 +1,5 @@
 "use client";
-import { User, Mail, Shield, Bell, Key, ShieldCheck, HardDrive, Smartphone, Save, Trash2, Lock, Eye, EyeOff, X } from "lucide-react";
+import { User, Mail, Shield, Key, ShieldCheck, Smartphone, Save, Trash2, Lock, Eye, EyeOff, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { API_BASE_URL, API_V1_URL } from "@/lib/api";
 
@@ -20,7 +20,7 @@ export default function ProfilePage() {
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-  
+
   const fetchProfile = async () => {
     setLoading(true);
     setStatusMessage(null);
@@ -48,7 +48,7 @@ export default function ProfilePage() {
         setLoading(false);
         return;
       }
-      
+
       if (res.ok) {
         const data = await res.json();
         setEmail(data.email || "");
@@ -64,7 +64,7 @@ export default function ProfilePage() {
           text: `Backend returned error ${res.status}: ${res.statusText}`
         });
       }
-      
+
       try {
         const sessionsRes = await fetch(`${API_V1_URL}/auth/sessions`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -218,18 +218,16 @@ export default function ProfilePage() {
 
   return (
     <>
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-4 md:mb-6 fade-in">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4 fade-in">
         <div>
-          <h2 className="font-cormorant text-[48px] md:text-[64px] leading-14.5 md:leading-19.5 font-bold tracking-tight mb-1">
-            User Profile
-          </h2>
-          <p className="text-white/60 font-inter text-sm">Manage your account credentials, security settings, and active sessions.</p>
+          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight mb-1">User Profile</h1>
+          <p className="text-muted-foreground text-sm">Manage your account credentials, security settings, and active sessions.</p>
         </div>
-        <div className="flex items-center gap-4 mt-4 md:mt-0">
-          <button 
+        <div className="flex items-center gap-4">
+          <button
             onClick={handleSaveChanges}
             disabled={saving || loading}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg btn-primary text-white font-inter text-sm font-medium cursor-pointer"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg btn-primary text-sm font-medium cursor-pointer"
           >
             <Save className="w-4 h-4" />
             {saving ? "Saving..." : "Save Changes"}
@@ -239,20 +237,20 @@ export default function ProfilePage() {
 
       {statusMessage && (
         <div className={`mb-6 p-4 rounded-lg flex items-center justify-between border ${
-          statusMessage.type === 'success' 
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+          statusMessage.type === 'success'
+            ? 'bg-success/10 border-success/30 text-success'
             : statusMessage.type === 'warning'
-            ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-            : 'bg-red-500/10 border-red-500/30 text-red-400'
+            ? 'bg-warning/10 border-warning/30 text-warning'
+            : 'bg-destructive/10 border-destructive/30 text-destructive'
         }`}>
           <div className="flex items-center gap-3">
             <Shield className="w-5 h-5 shrink-0" />
-            <span className="font-inter text-sm">{statusMessage.text}</span>
+            <span className="text-sm">{statusMessage.text}</span>
           </div>
           {statusMessage.type === 'warning' && (
-            <button 
-              onClick={() => fetchProfile()} 
-              className="px-3 py-1 text-xs font-semibold rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 transition-colors"
+            <button
+              onClick={() => fetchProfile()}
+              className="px-3 py-1 text-xs font-semibold rounded-md bg-warning/15 hover:bg-warning/25 border border-warning/30 transition-colors"
             >
               Retry Connection
             </button>
@@ -260,64 +258,62 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 min-h-0 overflow-y-auto custom-scrollbar pb-10 fade-in">
-        
-        {/* Left Column - Personal Info */}
-        <div className="lg:col-span-5 2xl:col-span-4 flex flex-col gap-6">
-          <div className="surface-panel surface-panel-sheen p-6 lg:p-8 relative overflow-hidden group flex flex-col h-full">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-0 overflow-y-auto custom-scrollbar pb-10 fade-in">
 
-            <div className="flex items-center gap-4 mb-8 relative z-10">
-              <div className="w-20 h-20 rounded-full bg-linear-to-tr from-blue-600 to-indigo-500 p-[2px] shadow-[0_0_20px_rgba(37,99,235,0.3)]">
-                <div className="w-full h-full bg-[#001430] rounded-full flex items-center justify-center">
-                  <User className="w-10 h-10 text-blue-400" />
-                </div>
+        {/* Left Column - Personal Info */}
+        <div className="lg:col-span-5 2xl:col-span-4 flex flex-col gap-5">
+          <div className="surface-panel p-6 flex flex-col h-full">
+
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-16 h-16 rounded-full bg-muted border border-border flex items-center justify-center">
+                <User className="w-8 h-8 text-muted-foreground" />
               </div>
               <div>
-                <h3 className="font-inter text-2xl font-bold text-white tracking-tight">{loading ? "Loading..." : (fullName || "Admin User")}</h3>
-                <span className="text-xs font-inter text-blue-400/80 uppercase tracking-wider">Baitlock Administrator</span>
+                <h3 className="text-xl font-semibold tracking-tight">{loading ? "Loading..." : (fullName || "Admin User")}</h3>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">Baitlock Administrator</span>
               </div>
             </div>
 
-            <div className="space-y-6 relative z-10 flex-1">
+            <div className="space-y-5 flex-1">
               <div className="space-y-2">
-                <label className="text-[13px] text-white/50 font-inter uppercase tracking-wider">Full Name</label>
+                <label className="text-[13px] text-muted-foreground font-medium">Full Name</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                  <input 
-                    type="text" 
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
                     value={fullName}
                     placeholder="Enter your full name"
                     onChange={(e) => setFullName(e.target.value)}
-                    className="w-full bg-[#1E2022]/40 border border-white/10 rounded-md py-2.5 pl-11 pr-4 text-white font-inter focus:outline-none focus:border-blue-500/50 focus:bg-[#1E2022]/60 transition-all"
+                    className="w-full input-base py-2.5 pl-10 pr-4 text-sm"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[13px] text-white/50 font-inter uppercase tracking-wider">Email Address</label>
+                <label className="text-[13px] text-muted-foreground font-medium">Email Address</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                  <input 
-                    type="email" 
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="email"
                     value={email}
                     placeholder="admin@baitlock.local"
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-[#1E2022]/40 border border-white/10 rounded-md py-2.5 pl-11 pr-4 text-white font-inter focus:outline-none focus:border-blue-500/50 focus:bg-[#1E2022]/60 transition-all"
+                    className="w-full input-base py-2.5 pl-10 pr-4 text-sm"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[13px] text-white/50 font-inter uppercase tracking-wider">Password</label>
+                <label className="text-[13px] text-muted-foreground font-medium">Password</label>
                 <div className="relative">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                  <input 
-                    type="password" 
+                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="password"
                     value="••••••••••••"
                     readOnly
-                    className="w-full bg-[#1E2022]/40 border border-white/10 rounded-md py-2.5 pl-11 pr-24 text-white font-inter cursor-not-allowed opacity-70"
+                    className="w-full input-base py-2.5 pl-10 pr-24 text-sm cursor-not-allowed text-muted-foreground"
                   />
-                  <button 
+                  <button
                     type="button"
                     onClick={() => {
                       setPasswordError(null);
@@ -327,50 +323,50 @@ export default function ProfilePage() {
                       setConfirmPassword("");
                       setShowPasswordModal(true);
                     }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-blue-400 hover:text-blue-300 font-inter px-2.5 py-1 rounded hover:bg-blue-500/10 transition-colors cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-primary hover:underline px-2 py-1 rounded transition-colors cursor-pointer"
                   >
                     Change
                   </button>
                 </div>
               </div>
             </div>
-            
-            <div className="absolute -top-20 -right-20 w-48 h-48 bg-blue-600/10 blur-3xl rounded-full" />
           </div>
         </div>
 
         {/* Right Column - Security & Settings */}
-        <div className="lg:col-span-7 2xl:col-span-8 flex flex-col gap-6">
-          
+        <div className="lg:col-span-7 2xl:col-span-8 flex flex-col gap-5">
+
           {/* Active Sessions */}
-          <div className="surface-panel p-6 lg:p-8 relative overflow-hidden">
+          <div className="surface-panel p-6">
             <div className="flex items-center gap-3 mb-6">
-              <Smartphone className="w-8 h-8 text-white/80" />
+              <div className="w-10 h-10 rounded-lg bg-muted border border-border flex items-center justify-center">
+                <Smartphone className="w-5 h-5 text-muted-foreground" />
+              </div>
               <div>
-                <h3 className="font-cormorant font-bold text-[28px] leading-8.5 tracking-tight">Active Sessions</h3>
-                <p className="text-sm text-white/60 font-inter">{sessions.length} device{sessions.length === 1 ? '' : 's'} logged in.</p>
+                <h3 className="text-lg font-semibold tracking-tight">Active Sessions</h3>
+                <p className="text-sm text-muted-foreground">{sessions.length} device{sessions.length === 1 ? '' : 's'} logged in.</p>
               </div>
             </div>
-            
-            <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+
+            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
               {sessions.map(s => (
-                <div key={s.id} className="flex justify-between items-center bg-[#1E2022]/40 hover:bg-[#1E2022]/60 border border-white/5 p-4 rounded-lg transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                      <Smartphone className="w-5 h-5 text-blue-400" />
+                <div key={s.id} className="flex justify-between items-center bg-muted/40 hover:bg-muted border border-border p-3.5 rounded-lg transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-card border border-border flex items-center justify-center">
+                      <Smartphone className="w-4 h-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <div className="font-mono text-sm text-white/90">{s.ip_address}</div>
-                      <div className="text-xs text-white/50 font-inter">Session started on {new Date(s.created_at).toLocaleDateString()}</div>
+                      <div className="font-mono text-sm text-foreground">{s.ip_address}</div>
+                      <div className="text-xs text-muted-foreground">Session started on {new Date(s.created_at).toLocaleDateString()}</div>
                     </div>
                   </div>
-                  <div className="px-3 py-1 bg-green-500/10 border border-green-500/20 rounded text-xs font-mono text-green-400">
-                    Active
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-success/10 border border-success/25 rounded-md text-xs font-medium text-success">
+                    <span className="w-1.5 h-1.5 rounded-full bg-success" /> Active
                   </div>
                 </div>
               ))}
               {sessions.length === 0 && (
-                <div className="text-center p-6 text-white/40 italic text-sm border border-white/5 rounded-lg border-dashed">
+                <div className="text-center p-6 text-muted-foreground text-sm border border-dashed border-border rounded-lg">
                   No active sessions found.
                 </div>
               )}
@@ -378,22 +374,22 @@ export default function ProfilePage() {
           </div>
 
           {/* Security Settings */}
-          <div className="surface-panel p-6 lg:p-8 relative overflow-hidden">
-            <h3 className="font-cormorant font-bold text-[28px] leading-8.5 tracking-tight mb-6">Security Settings</h3>
-            
+          <div className="surface-panel p-6">
+            <h3 className="text-lg font-semibold tracking-tight mb-5">Security Settings</h3>
+
             <div className="w-full">
-              <div className="p-5 rounded-lg border border-red-500/20 bg-red-500/5 backdrop-blur-sm transition-all hover:bg-red-500/10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div className="p-5 rounded-lg border border-destructive/25 bg-destructive/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-start gap-4 flex-1">
-                  <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0 border border-red-500/20 mt-1 md:mt-0">
-                    <Trash2 className="w-5 h-5 text-red-400" />
+                  <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0 border border-destructive/20">
+                    <Trash2 className="w-5 h-5 text-destructive" />
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-medium text-white/90 text-lg mb-1">Delete Account</h4>
-                    <p className="text-sm text-white/60 font-inter">Permanently remove your account and all associated data.</p>
+                    <h4 className="font-medium text-base mb-1">Delete Account</h4>
+                    <p className="text-sm text-muted-foreground">Permanently remove your account and all associated data.</p>
                   </div>
                 </div>
-                <div className="mt-2 md:mt-0 shrink-0">
-                  <button onClick={handleDeleteAccount} className="text-sm font-medium text-red-400 border border-red-500/30 px-5 py-2.5 rounded hover:bg-red-500/10 transition-colors cursor-pointer whitespace-nowrap w-full md:w-auto">
+                <div className="shrink-0">
+                  <button onClick={handleDeleteAccount} className="text-sm font-medium text-destructive border border-destructive/30 px-5 py-2.5 rounded-lg hover:bg-destructive/10 transition-colors cursor-pointer whitespace-nowrap w-full md:w-auto">
                     Delete Account
                   </button>
                 </div>
@@ -406,25 +402,24 @@ export default function ProfilePage() {
 
       {/* Password Change Modal */}
       {showPasswordModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div
-            className="w-full max-w-md surface-panel surface-panel-sheen p-6 sm:p-8 relative fade-in"
-          >
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md surface-panel p-6 sm:p-7 fade-in shadow-xl">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                  <Lock className="w-5 h-5 text-blue-400" />
+                <div className="w-10 h-10 rounded-lg bg-muted border border-border flex items-center justify-center">
+                  <Lock className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-inter font-bold text-lg text-white">Change Password</h3>
-                  <p className="text-xs text-white/50 font-inter">Update your account credentials</p>
+                  <h3 className="font-semibold text-lg">Change Password</h3>
+                  <p className="text-xs text-muted-foreground">Update your account credentials</p>
                 </div>
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={() => setShowPasswordModal(false)}
-                className="text-white/40 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                aria-label="Close"
+                className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-accent transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -432,50 +427,50 @@ export default function ProfilePage() {
 
             {/* Error & Success Messages */}
             {passwordError && (
-              <div className="mb-4 p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-inter flex items-center gap-2">
+              <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/25 text-destructive text-xs flex items-center gap-2">
                 <Shield className="w-4 h-4 shrink-0" />
                 <span>{passwordError}</span>
               </div>
             )}
             {passwordSuccess && (
-              <div className="mb-4 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-inter flex items-center gap-2">
+              <div className="mb-4 p-3 rounded-lg bg-success/10 border border-success/25 text-success text-xs flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 shrink-0" />
                 <span>{passwordSuccess}</span>
               </div>
             )}
 
             {/* Form */}
-            <form onSubmit={handlePasswordChange} className="space-y-4 font-inter">
+            <form onSubmit={handlePasswordChange} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs text-white/60 uppercase tracking-wider">Current Password (optional)</label>
+                <label className="text-xs text-muted-foreground font-medium">Current Password (optional)</label>
                 <div className="relative">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
                     type="password"
                     value={currentPassword}
                     placeholder="Enter current password if applicable"
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full bg-[#1E2022]/40 border border-white/10 rounded-md py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50 focus:bg-[#1E2022]/60 transition-all"
+                    className="w-full input-base py-2.5 pl-10 pr-4 text-sm"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs text-white/60 uppercase tracking-wider">New Password</label>
+                <label className="text-xs text-muted-foreground font-medium">New Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
                     type={showNewPassword ? "text" : "password"}
                     value={newPassword}
                     placeholder="Minimum 8 characters"
                     required
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-[#1E2022]/40 border border-white/10 rounded-md py-2.5 pl-10 pr-10 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50 focus:bg-[#1E2022]/60 transition-all"
+                    className="w-full input-base py-2.5 pl-10 pr-10 text-sm"
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                   >
                     {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -483,32 +478,32 @@ export default function ProfilePage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs text-white/60 uppercase tracking-wider">Confirm New Password</label>
+                <label className="text-xs text-muted-foreground font-medium">Confirm New Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
                     type="password"
                     value={confirmPassword}
                     placeholder="Re-enter new password"
                     required
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full bg-[#1E2022]/40 border border-white/10 rounded-md py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50 focus:bg-[#1E2022]/60 transition-all"
+                    className="w-full input-base py-2.5 pl-10 pr-4 text-sm"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10 mt-6">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border mt-6">
                 <button
                   type="button"
                   onClick={() => setShowPasswordModal(false)}
-                  className="px-4 py-2 text-sm text-white/60 hover:text-white rounded-md hover:bg-white/5 transition-colors cursor-pointer"
+                  className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isChangingPassword}
-                  className="px-5 py-2 text-sm font-medium text-white rounded-lg btn-primary cursor-pointer flex items-center gap-2"
+                  className="px-5 py-2 text-sm font-medium rounded-lg btn-primary cursor-pointer flex items-center gap-2"
                 >
                   {isChangingPassword ? "Updating..." : "Update Password"}
                 </button>

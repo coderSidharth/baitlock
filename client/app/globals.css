@@ -1,179 +1,283 @@
 @import "tailwindcss";
 
-@theme {
-  --font-inter: var(--font-inter);
-  --font-cormorant: var(--font-cormorant);
-  --font-mono: var(--font-mono);
-}
+/* Enable class-based dark mode (toggled on <html class="dark">) */
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* ============================================================
-   Baitlock design tokens
-   Central palette + surface definitions. Presentation only.
+   Baitlock design system — flat, neutral, professional
+   Semantic tokens drive both light and dark themes.
    ============================================================ */
 :root {
-  /* Base canvas */
-  --bl-bg: #070910;
-  --bl-bg-soft: #0b0e18;
+  color-scheme: light;
 
-  /* Brand accents */
-  --bl-accent: #2f6fe0;
-  --bl-accent-strong: #1b4fb8;
-  --bl-accent-soft: #0048a6;
-  --bl-cyan: #38d6f0;
+  --background: #ffffff;
+  --foreground: #09090b;
 
-  /* Panel (primary navy surface) */
-  --bl-panel-from: #0c2a57;
-  --bl-panel-to: #06162f;
-  --bl-panel-border: rgba(120, 170, 255, 0.12);
+  --card: #ffffff;
+  --card-foreground: #09090b;
 
-  /* Card (neutral slate surface used for list/feed items) */
-  --bl-card-from: #1b2436;
-  --bl-card-mid: #131a29;
-  --bl-card-to: #0b1019;
-  --bl-card-border: rgba(255, 255, 255, 0.08);
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
 
-  /* Hairlines + shadows */
-  --bl-hairline: rgba(255, 255, 255, 0.08);
-  --bl-shadow: 0 20px 48px -22px rgba(0, 0, 0, 0.7);
-  --bl-shadow-soft: 0 12px 30px -18px rgba(0, 0, 0, 0.55);
-  --bl-ring: rgba(47, 111, 224, 0.55);
+  --muted: #f4f4f5;
+  --muted-foreground: #52525b;
+
+  --subtle: #fafafa;
+
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #2563eb;
+
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+
+  --radius: 0.75rem;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: #09090b;
+  --foreground: #fafafa;
+
+  --card: #121214;
+  --card-foreground: #fafafa;
+
+  --popover: #141417;
+  --popover-foreground: #fafafa;
+
+  --muted: #1b1b1f;
+  --muted-foreground: #a1a1aa;
+
+  --subtle: #141417;
+
+  --border: #27272a;
+  --input: #2a2a2e;
+  --ring: #3b82f6;
+
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+
+  --secondary: #1f1f23;
+  --secondary-foreground: #fafafa;
+
+  --accent: #1f1f23;
+  --accent-foreground: #fafafa;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --success: #22c55e;
+  --success-foreground: #04120a;
+
+  --warning: #f59e0b;
+  --warning-foreground: #1a1205;
+}
+
+/* Expose tokens to Tailwind utilities (bg-background, text-foreground, …) */
+@theme inline {
+  --font-inter: var(--font-inter);
+  --font-mono: var(--font-mono);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle: var(--subtle);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
 }
 
 @layer base {
-  body {
-    @apply font-sans text-zinc-100;
-    background-color: var(--bl-bg);
+  * {
+    border-color: var(--border);
   }
 
-  /* Smoother, consistent focus treatment for inputs/buttons */
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
   :focus-visible {
     outline: none;
   }
 
   ::selection {
-    background: rgba(47, 111, 224, 0.35);
-    color: #fff;
+    background: color-mix(in oklab, var(--primary) 28%, transparent);
   }
 }
 
+/* Typography helpers.
+   The product historically used a serif display face via .font-cormorant.
+   The flat system standardizes on Inter for a clean, consistent voice. */
 .font-inter {
-  font-family: var(--font-inter), sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 .font-cormorant {
-  font-family: var(--font-cormorant), serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  font-weight: 600;
 }
 
 .font-mono {
-  font-family: var(--font-mono), monospace;
+  font-family: var(--font-mono), ui-monospace, monospace;
 }
 
 /* ============================================================
-   Reusable surface + control classes
+   Flat surface + control primitives
    ============================================================ */
-
-/* Primary navy panel — replaces the repeated inline linear-gradient */
 .surface-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* Legacy sheen hook kept as a no-op in the flat system */
+.surface-panel-sheen {
   position: relative;
-  background: linear-gradient(156.55deg, var(--bl-panel-from) -42%, var(--bl-panel-to) 116%);
-  border: 1px solid var(--bl-panel-border);
-  border-radius: 16px;
-  box-shadow: var(--bl-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-/* Subtle top sheen for panels that opt in */
-.surface-panel-sheen::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(120% 60% at 50% -10%, rgba(99, 160, 255, 0.14), transparent 60%);
-  pointer-events: none;
-}
-
-/* Neutral slate card — replaces the grey radial feed-card gradient */
 .surface-card {
-  background: radial-gradient(130% 150% at 50% 0%, var(--bl-card-from) 0%, var(--bl-card-mid) 55%, var(--bl-card-to) 100%);
-  border: 1px solid var(--bl-card-border);
-  border-radius: 14px;
+  background: var(--subtle);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 0.25rem);
 }
 
-/* Glass navigation / chrome surface */
 .surface-glass {
-  background: rgba(10, 14, 24, 0.55);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-color: var(--bl-hairline);
+  background: var(--background);
+  border-color: var(--border);
 }
 
-/* Interactive lift for cards/rows */
 .hover-lift {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 .hover-lift:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 26px 54px -26px rgba(0, 0, 0, 0.8);
+  border-color: color-mix(in oklab, var(--foreground) 22%, var(--border));
 }
 
-/* Buttons */
 .btn-primary {
-  background: linear-gradient(180deg, #3576e6 0%, #1b4fb8 100%);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 10px 24px -12px rgba(47, 111, 224, 0.75),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  transition: filter 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
 }
 .btn-primary:hover {
-  filter: brightness(1.08);
+  background: color-mix(in oklab, var(--primary) 88%, black);
+}
+.dark .btn-primary:hover {
+  background: color-mix(in oklab, var(--primary) 86%, white);
 }
 .btn-primary:active {
-  transform: translateY(1px);
+  transform: translateY(0.5px);
 }
 .btn-primary:disabled {
-  filter: none;
   opacity: 0.55;
 }
 
-.btn-ghost {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+.btn-secondary {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-.btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
+.btn-secondary:hover {
+  background: var(--accent);
+  border-color: color-mix(in oklab, var(--foreground) 18%, var(--border));
 }
 
-/* Shared input focus ring */
-.input-ring {
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+.btn-ghost {
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
+.btn-ghost:hover {
+  background: var(--accent);
+}
+
+.btn-destructive {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+.btn-destructive:hover {
+  opacity: 0.9;
+}
+
+/* Form controls */
+.input-base {
+  background: var(--background);
+  border: 1px solid var(--input);
+  color: var(--foreground);
+  border-radius: calc(var(--radius) - 0.25rem);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.input-base::placeholder {
+  color: color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+}
+.input-base:focus,
 .input-ring:focus {
-  border-color: var(--bl-accent);
-  box-shadow: 0 0 0 3px rgba(47, 111, 224, 0.2);
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 22%, transparent);
+}
+.input-ring {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 /* ============================================================
    Scrollbars
    ============================================================ */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
-
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
-
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in oklab, var(--muted-foreground) 35%, transparent);
   border-radius: 8px;
 }
-
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -185,16 +289,15 @@
 }
 
 /* ============================================================
-   Animations
+   Minimal motion
    ============================================================ */
 .fade-in {
-  animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 0.4s ease forwards;
 }
-
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -203,13 +306,12 @@
 }
 
 .animate-fade-in {
-  animation: fadeInScale 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeInScale 0.25s ease forwards;
 }
-
 @keyframes fadeInScale {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.98);
+    transform: translateY(4px) scale(0.99);
   }
   to {
     opacity: 1;
@@ -217,26 +319,15 @@
   }
 }
 
-@keyframes shine {
-  0% {
-    transform: translateX(-150%) skewX(12deg);
-  }
-  100% {
-    transform: translateX(200%) skewX(12deg);
-  }
-}
-
-.animate-shine {
-  animation: shine 3s infinite linear;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .fade-in,
-  .animate-fade-in,
-  .animate-shine {
+  .animate-fade-in {
     animation: none;
   }
-  .hover-lift {
+  .hover-lift,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost {
     transition: none;
   }
 }
