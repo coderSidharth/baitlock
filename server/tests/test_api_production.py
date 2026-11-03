@@ -230,3 +230,26 @@ def test_inference_thread_limit_targets_openmp():
     phishing_ml.predict_phishing_ml("https://example.com/login")
     apis = {lib["user_api"] for lib in phishing_ml._threadpools.info()}
     assert "openmp" in apis
+
+
+# --------------------------------------------------------------------------- #
+# Fraud transactions are not domains
+# --------------------------------------------------------------------------- #
+def test_transaction_labels_cannot_be_whitelisted_or_blocked(client):
+    """Fraud events render as 'Txn: $15000.0'; they must never be stored as list entries."""
+    h = _auth(client)
+    for path in ("/api/v1/phishing/whitelist", "/api/v1/phishing/blocklist"):
+        r = client.post(path, json={"domain": "Txn: $15000.0"}, headers=h)
+        assert r.status_code == 422, (path, r.text)
+    assert _lists(client, h) == (set(), set())
+    # Real domains (including IPs and punycode) still work.
+    for d in ("shop.example.co.uk", "203.0.113.7", "xn--pple-43d.com"):
+        assert client.post("/api/v1/phishing/blocklist", json={"domain": d}, headers=h).status_code == 200
+
+
+def test_domain_validation_rules():
+    from app.features.phishing.service import is_valid_domain
+    for ok in ("example.com", "a.b.example.org", "xn--pple-43d.com", "10.0.0.1", "my_host.example.net"):
+        assert is_valid_domain(ok), ok
+    for bad in ("txn", "", "-bad.com", "bad-.com", "example.c0m", "exa mple.com", "localhost"):
+        assert not is_valid_domain(bad), bad

@@ -4,7 +4,7 @@ import { Ban, ShieldAlert, CheckCircle, Trash2 } from "lucide-react";
 import { API_V1_URL } from "@/lib/api";
 
 type DomainEntry = { domain?: string };
-type FeedEvent = { id: string; target: string; tier: string; score: number; verdict: string };
+type FeedEvent = { id: string; type?: string; target: string; tier: string; score: number; verdict: string };
 type OverrideEntry = FeedEvent & { isExplicit?: boolean };
 
 export default function OverridesPage() {
@@ -44,7 +44,9 @@ export default function OverridesPage() {
             };
 
             const blocked = (eventsData.events || []).filter(
-                (e: FeedEvent) => (e.tier === "high" || e.tier === "critical") && !isWhitelisted(e.target)
+                // Only phishing events carry a domain; fraud transactions ("Txn: $…") cannot be
+                // blocked or whitelisted and must not appear here with a "Mark Safe" action.
+                (e: FeedEvent) => e.type === "phishing" && (e.tier === "high" || e.tier === "critical") && !isWhitelisted(e.target)
             );
 
             const explicitBlocks = (blocklistData.blocklist || [])

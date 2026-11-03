@@ -8,6 +8,7 @@ from app.features.phishing.reputation import domain_reputation
 import json
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
+import ipaddress
 import requests
 import re
 
@@ -17,13 +18,41 @@ def normalize_domain(value: str) -> str:
     return (parsed.hostname or candidate.split("/", 1)[0].split(":", 1)[0]).lower().rstrip(".")
 
 
+_LABEL = re.compile(r"^(?!-)[a-z0-9_-]{1,63}(?<!-)$")
+
+
+def is_valid_domain(domain: str) -> bool:
+    """True for a real hostname (at least one dot, valid labels and TLD) or an IP address."""
+    if not domain or len(domain) > 253:
+        return False
+    try:
+        ipaddress.ip_address(domain)
+        return True
+    except ValueError:
+        pass
+    labels = domain.split(".")
+    if len(labels) < 2 or not all(_LABEL.match(label) for label in labels):
+        return False
+    tld = labels[-1]
+    return tld.startswith("xn--") or (tld.isalpha() and len(tld) >= 2)
+
+
+def require_domain(value: str) -> str:
+    """Normalize `value` to a domain or raise ValueError (e.g. for "Txn: $15000.0")."""
+    domain = normalize_domain(value)
+    if not is_valid_domain(domain):
+        raise ValueError(f"'{value}' is not a valid domain name")
+    return domain
+
+
 def set_whitelisted(db: Session, user_id: int, domain: str) -> str:
     """Add a domain to the user's whitelist, removing it from the blocklist.
 
     Whitelist and blocklist are mutually exclusive: a domain can only ever be on
     one of them for a given user, so trusting a site also un-blocks it.
+    Raises ValueError if `domain` is not a valid domain name.
     """
-    domain = normalize_domain(domain)
+    domain = require_domain(domain)
     # Remove any conflicting blocklist entry first (mutual exclusivity)
     db.query(UserBlocklist).filter(
         UserBlocklist.user_id == user_id,
@@ -43,8 +72,9 @@ def set_blocklisted(db: Session, user_id: int, domain: str) -> str:
     """Add a domain to the user's blocklist, removing it from the whitelist.
 
     Mutual exclusivity mirror of set_whitelisted: blocking a site also un-trusts it.
+    Raises ValueError if `domain` is not a valid domain name.
     """
-    domain = normalize_domain(domain)
+    domain = require_domain(domain)
     # Remove any conflicting whitelist entry first (mutual exclusivity)
     db.query(UserWhitelist).filter(
         UserWhitelist.user_id == user_id,
@@ -71,7 +101,6 @@ def strip_tags(html: str) -> str:
     text = re.sub(r'<[^>]+>', ' ', html)
     return ' '.join(text.split())
 
-import ipaddress
 import socket
 
 def _is_safe_url(url: str) -> bool:

@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.features.auth.models import User
 from app.api.deps import get_db, get_optional_user, get_current_user
@@ -35,7 +35,10 @@ def add_to_whitelist(
     user_id = user.id
     # Adding to the whitelist also removes the domain from the blocklist
     # (whitelist and blocklist are mutually exclusive).
-    domain = set_whitelisted(db, user_id, req.domain)
+    try:
+        domain = set_whitelisted(db, user_id, req.domain)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
     return {"status": "success", "message": f"{domain} has been added to your personal whitelist."}
 
@@ -76,7 +79,10 @@ def add_to_blocklist(
     user_id = user.id
     # Adding to the blocklist also removes the domain from the whitelist
     # (whitelist and blocklist are mutually exclusive).
-    domain = set_blocklisted(db, user_id, req.domain)
+    try:
+        domain = set_blocklisted(db, user_id, req.domain)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
     return {"status": "success", "message": f"{domain} has been added to blocklist."}
 

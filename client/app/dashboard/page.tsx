@@ -21,6 +21,10 @@ export default function DashboardPage() {
 
   const averageScore = events.length > 0 ? Math.round(events.reduce((acc, evt) => acc + evt.score, 0) / events.length) : 100;
   const criticalEvents = events.filter(e => e.tier === 'critical' || e.tier === 'high');
+  // Only phishing events have a domain. Fraud events are transactions ("Txn: $…") and must
+  // never be presented as sites to block or allow.
+  const blockedSites = criticalEvents.filter(e => e.type === 'phishing');
+  const topThreat = blockedSites[0] || criticalEvents[0];
   const filteredEvents = filterType === 'All' ? events : events.filter(e => e.type.toLowerCase() === filterType.toLowerCase());
 
   const fetchEvents = () => {
@@ -190,13 +194,12 @@ export default function DashboardPage() {
               Blocked Sites
             </h3>
             <div className="flex flex-col gap-2 w-full">
-              {events
-                .filter(e => e.tier === "high" || e.tier === "critical")
+              {blockedSites
                 .slice(0, 3)
                 .map(event => (
                   <BlockedSite key={event.id} domain={event.target} reason={event.type.toUpperCase()} />
               ))}
-              {events.filter(e => e.tier === "high" || e.tier === "critical").length === 0 && (
+              {blockedSites.length === 0 && (
                 <div className="text-muted-foreground text-[13px] py-2 text-center">No blocks recently</div>
               )}
             </div>
@@ -252,13 +255,17 @@ export default function DashboardPage() {
               <div className="space-y-5 text-[15px] leading-relaxed text-foreground">
                 {criticalEvents.length > 0 ? (
                   <>
-                    <p>The neural model has intercepted <strong>{criticalEvents.length} severe threat(s)</strong> recently, including highly suspicious activity originating from <span className="text-destructive font-mono text-[13px] break-all bg-destructive/10 border border-destructive/20 px-1.5 py-0.5 rounded inline-block mt-1">{criticalEvents[0].target}</span>.</p>
+                    <p>The neural model has intercepted <strong>{criticalEvents.length} severe threat(s)</strong> recently, including {topThreat.type === 'phishing' ? 'highly suspicious activity originating from' : 'a high-risk transaction'} <span className="text-destructive font-mono text-[13px] break-all bg-destructive/10 border border-destructive/20 px-1.5 py-0.5 rounded inline-block mt-1">{topThreat.target}</span>.</p>
                     <div className="p-5 rounded-lg border border-border bg-muted/40">
                       <h4 className="font-medium mb-2 flex items-center gap-2 text-[15px]">
                         <ShieldAlert className="w-5 h-5 text-warning shrink-0" />
                         Recommended Action
                       </h4>
-                      <p className="text-sm text-muted-foreground">Avoid interacting with <strong className="break-all text-foreground">{criticalEvents[0].target}</strong>. We recommend navigating to your Blocklist to ensure this domain is permanently restricted from your network.</p>
+                      {topThreat.type === 'phishing' ? (
+                        <p className="text-sm text-muted-foreground">Avoid interacting with <strong className="break-all text-foreground">{topThreat.target}</strong>. We recommend navigating to your Blocklist to ensure this domain is permanently restricted from your network.</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Hold <strong className="break-all text-foreground">{topThreat.target}</strong> for manual review and verify it with the account holder before it is processed.</p>
+                      )}
                     </div>
                   </>
                 ) : (
