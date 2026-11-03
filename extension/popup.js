@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    const API_BASE = "http://localhost:8000/api/v1";
+    const API_BASE = BAITLOCK_CONFIG.API_BASE;
     let token = null;
 
     // Views
@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let activeUrl = currentTab.url;
                 try {
                     const parsedUrl = new URL(currentTab.url);
-                    if (parsedUrl.hostname === 'localhost' && parsedUrl.searchParams.has('blocked') && parsedUrl.searchParams.has('url')) {
+                    if (baitlockIsAppUrl(currentTab.url) && parsedUrl.searchParams.has('blocked') && parsedUrl.searchParams.has('url')) {
                         activeUrl = parsedUrl.searchParams.get('url');
                     }
                     currentDomain = new URL(activeUrl).hostname;
@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Sync auth to Web App
     function syncWebAuth(action, tokenValue = null) {
-        chrome.tabs.query({ url: "http://localhost:3000/*" }, (tabs) => {
+        chrome.tabs.query({ url: `${BAITLOCK_CONFIG.APP_ORIGIN}/*` }, (tabs) => {
             tabs.forEach(tab => {
                 chrome.scripting.executeScript({
                     target: { tabId: tab.id },
@@ -301,7 +301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     let activeUrl = currentTab.url;
                     try {
                         const parsedUrl = new URL(currentTab.url);
-                        if (parsedUrl.hostname === 'localhost' && parsedUrl.searchParams.has('url')) {
+                        if (baitlockIsAppUrl(currentTab.url) && parsedUrl.searchParams.has('url')) {
                             activeUrl = parsedUrl.searchParams.get('url');
                         }
                     } catch(e) {}

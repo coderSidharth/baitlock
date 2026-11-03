@@ -11,6 +11,12 @@ wheels/
 
 # Database
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
 
 # Environment
 .env
+
+# Generated training data (rebuild with scripts/build_dataset.py)
+data/training/

@@ -1,205 +1,188 @@
-import os
+"""
+Layer-2 phishing classifier (URL-lexical model).
+
+The production model is trained offline by `train.py` on a large public
+dataset (see scripts/build_dataset.py) and shipped as a versioned bundle:
+
+    {
+      "model": <sklearn classifier with predict_proba>,
+      "feature_names": [...],   # must equal features.FEATURE_NAMES
+      "version": "2.x.y",
+      "trained_at": ISO-8601,
+      "metrics": {...},         # held-out evaluation, see model_card.json
+    }
+
+At load time the bundle's feature schema is validated against the running
+feature extractor. If the artifact is missing, unreadable, or was trained on a
+different schema, a small fallback model is fitted from the curated reference
+URLs so the service keeps working, and /health reports the degraded state.
+"""
+
+from __future__ import annotations
+
+import logging
 import pickle
-import numpy as np
+import threading
 from pathlib import Path
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import precision_score, recall_score, f1_score
-from .features import extract_url_features
 
-# Global model instance
-_model = None
-MODEL_PATH = Path(__file__).parent / "phishing_rf_model.pkl"
+import numpy as np
+from threadpoolctl import ThreadpoolController
 
-# Curated dataset representing Tranco / Alexa top legitimate domains
-TRANCO_TOP_LEGITIMATE_URLS = [
-    "https://google.com",
-    "https://www.google.com/search?q=cybersecurity",
-    "https://youtube.com/watch?v=dQw4w9WgXcQ",
-    "https://facebook.com/profile",
-    "https://amazon.com/products/electronics",
-    "https://wikipedia.org/wiki/Phishing",
-    "https://github.com/torvalds/linux",
-    "https://microsoft.com/en-us/windows",
-    "https://apple.com/iphone",
-    "https://linkedin.com/feed",
-    "https://netflix.com/browse",
-    "https://reddit.com/r/netsec",
-    "https://twitter.com/home",
-    "https://stackoverflow.com/questions/tagged/python",
-    "https://cloudflare.com/learning/access-management/what-is-phishing/",
-    "https://nytimes.com/section/technology",
-    "https://bbc.com/news/technology",
-    "https://mozilla.org/en-US/firefox/new/",
-    "https://dropbox.com/home",
-    "https://spotify.com/us/premium",
-    "https://paypal.com/signin",
-    "https://chase.com",
-    "https://wellsfargo.com",
-    "https://bankofamerica.com",
-    "https://stripe.com/docs",
-    "https://python.org/downloads",
-    "https://pypi.org/project/scikit-learn",
-    "https://news.ycombinator.com",
-    "https://medium.com/topic/cybersecurity",
-    "https://gitlab.com/explore",
-    "https://docker.com/products/docker-desktop",
-    "https://slack.com",
-    "https://zoom.us/join",
-    "https://adobe.com/creativecloud.html",
-    "https://salesforce.com",
-    "https://oracle.com/cloud",
-    "https://ibm.com/security",
-    "https://cisco.com",
-    "https://mit.edu",
-    "https://stanford.edu",
-]
+from .features import FEATURE_NAMES, extract_url_features
+from .reference_urls import BENIGN_REFERENCE, PHISHING_REFERENCE
 
-# Curated dataset representing real-world feeds (PhishTank, OpenPhish, URLhaus)
-PHISHTANK_OPENPHISH_URLS = [
-    # Typosquats & deceptive impersonation
-    "http://secure-login-paypa1.com.update.php",
-    "http://login-update-account.pw",
-    "http://paypal.com.evil.xyz/login",
-    "http://appleid.apple.com.secure.login.verify-now.net",
-    "http://netflix-support-auth.com-verify.info",
-    "http://accounts-google-verify.security-alert.top",
-    "http://amaz0n-security-update.club/signin",
-    "http://chase-online-banking-security.pw/verify",
-    "http://wellsfargo-account-locked.site/auth",
-    "http://bankofamerica-fraud-prevention.online/login",
-    "http://dhl-express-tracking-delivery.vip/package",
-    "http://fedex-parcel-reschedule.click/update",
-    # IP-based direct phishing URLs (URLhaus)
-    "http://192.168.1.1/login",
-    "http://185.220.101.5/sec/bank/index.html",
-    "http://45.142.166.112/auth/login.php",
-    "http://194.26.29.11/secure/verification",
-    "http://103.251.167.20/signin",
-    # Free/Abused TLD phishing (.tk, .ml, .ga, .cf, .gq)
-    "http://secure-paypal-payment.tk",
-    "http://login-google-drive.ml/share",
-    "http://steam-community-free-skins.ga/trade",
-    "http://apple-icloud-findmydevice.cf/map",
-    "http://bank-verification-login.gq/auth",
-    # Punycode homograph attacks
-    "http://xn--pple-43d.com/login",
-    "http://xn--gogle-qoa.com/verify",
-    # Deep subdomain deception
-    "http://login.apple.com.secure.verify.account.status.net/auth",
-    "http://signin.ebay.com.account-update.order-status.xyz/confirm",
-    "http://support.microsoft.com.security-alert-391.top/help",
-    "http://billing.netflix.com.update-payment-info.site/customer",
-    # High-entropy credential harvesters
-    "http://x82k9-secure-auth-381.top/login.html",
-    "http://q91zk8a77-verify-identity.pw/portal",
-    "http://a88172-meta-security-review.xyz/confirm",
-    "http://update-secure-auth.com",
-    "http://free-prize-claim.xyz",
-    "http://cdn-static-res.ru/c2/payload",
-    "http://login-verify-account.tk",
-    "http://wallet-connect-ledger.click/sync",
-    "http://metamask-security-alert.top/seed",
-    "http://binance-kyc-update.vip/login",
-    "http://coinbase-fraud-alert.pw/verify",
-    "http://irs-tax-refund-claim.site/form",
-]
+logger = logging.getLogger("baitlock.ml")
 
-def train_and_evaluate_model():
-    """
-    Extracts features for legitimate and phishing datasets,
-    evaluates performance on a held-out test split,
-    and returns a fitted RandomForestClassifier model.
-    """
-    np.random.seed(42)
-    X = []
-    y = []
+MODEL_PATH = Path(__file__).parent / "phishing_url_model.pkl"
 
-    for url in TRANCO_TOP_LEGITIMATE_URLS:
-        feats = extract_url_features(url)
-        X.append(list(feats.values()))
-        y.append(0)  # 0 = Safe
+# Backwards-compatible aliases (older imports / scripts).
+TRANCO_TOP_LEGITIMATE_URLS = BENIGN_REFERENCE
+PHISHTANK_OPENPHISH_URLS = PHISHING_REFERENCE
 
-    for url in PHISHTANK_OPENPHISH_URLS:
-        feats = extract_url_features(url)
-        X.append(list(feats.values()))
-        y.append(1)  # 1 = Phishing
+_lock = threading.Lock()
+_bundle: dict | None = None
 
-    X = np.array(X)
-    y = np.array(y)
+# Single-URL inference runs inside web-server worker threads. Letting OpenMP
+# spin up a parallel thread team there costs ~70 ms per call; one row needs no
+# parallelism. Batch training is unaffected (it does not go through _predict).
+_threadpools: ThreadpoolController | None = None
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.25, random_state=42, stratify=y
-    )
 
-    model = RandomForestClassifier(n_estimators=100, random_state=42, max_depth=10)
-    model.fit(X_train, y_train)
+def _predict(model, x):
+    global _threadpools
+    if _threadpools is None:
+        # Must be created lazily: a controller only sees native libraries that are
+        # already loaded, and scikit-learn's OpenMP runtime is loaded when the model
+        # is unpickled. Created at import time, the limit would silently do nothing.
+        _threadpools = ThreadpoolController()
+    with _threadpools.limit(limits=1, user_api="openmp"):
+        return model.predict_proba(x)
 
-    # Evaluate on held-out set
-    y_pred = model.predict(X_test)
-    prec = precision_score(y_test, y_pred, zero_division=0)
-    rec = recall_score(y_test, y_pred, zero_division=0)
-    f1 = f1_score(y_test, y_pred, zero_division=0)
 
-    print(f"[ML Model] Layer 2 Classifier Trained — Held-out Evaluation:")
-    print(f"           Precision: {prec:.4f} | Recall: {rec:.4f} | F1: {f1:.4f}")
+def _vectorize(urls):
+    rows = []
+    for u in urls:
+        f = extract_url_features(u)
+        rows.append([f[n] for n in FEATURE_NAMES])
+    return np.asarray(rows, dtype=float)
 
+
+def _fallback_bundle(reason: str) -> dict:
+    """Fit a small model from the curated reference sets (degraded mode)."""
+    from sklearn.ensemble import RandomForestClassifier
+
+    logger.warning("ML model artifact unavailable (%s); using fallback model.", reason)
+    X = _vectorize(BENIGN_REFERENCE + PHISHING_REFERENCE)
+    y = np.array([0] * len(BENIGN_REFERENCE) + [1] * len(PHISHING_REFERENCE))
+    clf = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
+    clf.fit(X, y)
+    return {
+        "model": clf,
+        "feature_names": list(FEATURE_NAMES),
+        "version": "fallback",
+        "trained_at": None,
+        "metrics": {},
+        "source": "fallback",
+        "fallback_reason": reason,
+    }
+
+
+def _load_bundle(path: Path = MODEL_PATH) -> dict:
+    if not path.exists():
+        return _fallback_bundle(f"{path.name} not found")
     try:
-        with open(MODEL_PATH, "wb") as f:
-            pickle.dump(model, f)
-    except Exception as e:
-        print(f"[ML Model] Warning: Unable to cache model to {MODEL_PATH}: {e}")
+        with open(path, "rb") as f:
+            obj = pickle.load(f)
+    except Exception as e:  # corrupt / incompatible pickle
+        return _fallback_bundle(f"could not load {path.name}: {e}")
 
-    return model
+    if not isinstance(obj, dict) or "model" not in obj:
+        return _fallback_bundle("legacy artifact without a feature schema")
+    if list(obj.get("feature_names", [])) != list(FEATURE_NAMES):
+        return _fallback_bundle("feature schema mismatch; retrain with train.py")
+
+    obj.setdefault("source", "artifact")
+    logger.info("Loaded phishing model v%s (trained %s).", obj.get("version"), obj.get("trained_at"))
+    return obj
+
 
 def get_trained_model():
-    """
-    Returns a trained Random Forest model.
-    Loads from disk cache if available, otherwise trains and persists.
-    """
-    global _model
-    if _model is not None:
-        return _model
+    """Return the loaded classifier (lazy, thread-safe)."""
+    return _get_bundle()["model"]
 
-    if MODEL_PATH.exists():
-        try:
-            with open(MODEL_PATH, "rb") as f:
-                _model = pickle.load(f)
-                return _model
-        except Exception:
-            pass
 
-    _model = train_and_evaluate_model()
-    return _model
+def _get_bundle() -> dict:
+    global _bundle
+    if _bundle is None:
+        with _lock:
+            if _bundle is None:
+                _bundle = _load_bundle()
+    return _bundle
+
+
+def warm_model() -> dict:
+    """Load the model eagerly (call at application startup)."""
+    b = _get_bundle()
+    # One dummy prediction to initialise any lazy internals.
+    _predict(b["model"], _vectorize(["https://example.com"]))
+    return model_status()
+
+
+def model_status() -> dict:
+    b = _bundle
+    if b is None:
+        return {"loaded": False}
+    return {
+        "loaded": True,
+        "source": b.get("source"),
+        "version": b.get("version"),
+        "trained_at": b.get("trained_at"),
+        "n_features": len(b.get("feature_names", [])),
+        **({"fallback_reason": b["fallback_reason"]} if b.get("fallback_reason") else {}),
+    }
+
+
+def reload_model(path: Path = MODEL_PATH) -> dict:
+    """Hot-swap the model artifact (e.g. after retraining)."""
+    global _bundle
+    new = _load_bundle(path)
+    with _lock:
+        _bundle = new
+    return model_status()
+
 
 def predict_phishing_ml(url: str) -> dict:
     """
-    Predicts if a URL is phishing using the Random Forest model.
-    Returns the score (0-100 where 100 is safe, 0 is phishing) and feature contributions.
+    Score a URL with the Layer-2 model.
+    Returns ml_score in 0-100 (100 = safe, 0 = phishing) plus human-readable reasons.
     """
-    model = get_trained_model()
-    features_dict = extract_url_features(url)
-    features_array = [list(features_dict.values())]
-    
-    # Predict probability of class 1 (phishing)
-    prob = model.predict_proba(features_array)[0][1]
-    
-    # Feature contributions for explainable AI telemetry
+    bundle = _get_bundle()
+    f = extract_url_features(url)
+    x = np.asarray([[f[n] for n in FEATURE_NAMES]], dtype=float)
+    prob = float(_predict(bundle["model"], x)[0][1])
+
     reasons = []
-    if features_dict['num_hyphens'] > 2:
-        reasons.append("High number of hyphens in domain")
-    if features_dict['has_ip'] == 1:
+    if f["has_ip"]:
         reasons.append("URL contains an IP address instead of a domain name")
-    if features_dict['brand_impersonation_score'] <= 2:
+    if f["brand_impersonation_score"] <= 2:
         reasons.append("Domain name is suspiciously similar to a known brand")
-    if features_dict['embedded_brand'] == 1 and features_dict['exact_brand_match'] == 0:
+    if f["embedded_brand"] and not f["exact_brand_match"]:
         reasons.append("A known brand name is deceptively embedded inside the domain")
-    if features_dict['domain_entropy'] > 3.8:
+    if f["num_hyphens_host"] > 2:
+        reasons.append("High number of hyphens in domain")
+    if f["host_entropy"] > 3.8:
         reasons.append("Unusually high character entropy in domain (random-looking string)")
-    if features_dict['has_https'] == 0:
-        reasons.append("Insecure HTTP transport")
-        
+    if f["free_hosting"] and prob >= 0.5:
+        reasons.append("Hosted on a free hosting platform commonly abused for phishing")
+    if f["is_shortener"]:
+        reasons.append("URL shortener hides the real destination")
+    if f["has_punycode"]:
+        reasons.append("Internationalised (punycode) domain can disguise look-alike characters")
+    if f["suspicious_keyword_count"] >= 3 and prob >= 0.5:
+        reasons.append("Multiple credential-harvesting keywords in the URL")
+
     return {
-        "ml_score": int((1.0 - prob) * 100),
-        "ml_reasons": reasons
+        "ml_score": int(round((1.0 - prob) * 100)),
+        "ml_probability": round(prob, 4),
+        "ml_reasons": reasons,
     }

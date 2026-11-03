@@ -7,8 +7,10 @@ from app.api import deps
 from app.core.config import settings
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.features.auth import models, schemas
+from app.core.rate_limit import FailedLoginLimiter
 
 router = APIRouter()
+login_limiter = FailedLoginLimiter(settings.LOGIN_RATE_LIMIT, settings.LOGIN_RATE_WINDOW_SECONDS)
 
 @router.post("/register", response_model=schemas.UserOut)
 def register(user_in: schemas.UserCreate, db: Session = Depends(deps.get_db)):
@@ -61,14 +63,24 @@ async def login(request: Request, db: Session = Depends(deps.get_db)):
         )
 
     username = username.strip().lower()
+    limiter_key = (request.client.host if request.client else "unknown", username)
+    wait = login_limiter.retry_after(limiter_key)
+    if wait:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed sign-in attempts. Please try again later.",
+            headers={"Retry-After": str(wait)},
+        )
     user = db.query(models.User).filter(models.User.email == username).first()
     if not user or not verify_password(password, user.hashed_password):
+        login_limiter.record_failure(limiter_key)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    login_limiter.reset(limiter_key)
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         subject=user.id, expires_delta=access_token_expires

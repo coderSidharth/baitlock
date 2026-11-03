@@ -14,12 +14,17 @@ engine = create_engine(
     pool_pre_ping=True
 )
 
-# Enable foreign key enforcement for SQLite (off by default)
+# SQLite connection tuning: FK enforcement (off by default), WAL journaling, busy timeout
 if settings.DATABASE_URL.startswith("sqlite"):
     @event.listens_for(engine, "connect")
     def _set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        # WAL: readers no longer block the writer and commits avoid a full fsync,
+        # which matters because every scan writes an event row.
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
         cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

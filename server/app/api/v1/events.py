@@ -18,16 +18,20 @@ def list_events(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    """Retrieve recent events for the dashboard live feed."""
+    """Retrieve recent events for the dashboard live feed.
+
+    Only the rows needed for the requested page are loaded: the newest
+    (offset + limit) rows of each table always contain the newest (offset + limit)
+    rows of the merged, time-ordered feed.
+    """
     events: List[Dict[str, Any]] = []
-    
+    window = offset + limit
+    total = 0
+
     if type is None or type == "phishing":
-        # Get total count for this user
-        phishing_query = db.query(PhishingEvent).filter(
-            PhishingEvent.user_id == user.id
-        ).order_by(PhishingEvent.created_at.desc())
-        
-        phishing_db = phishing_query.all()
+        phishing_base = db.query(PhishingEvent).filter(PhishingEvent.user_id == user.id)
+        total += phishing_base.count()
+        phishing_db = phishing_base.order_by(PhishingEvent.created_at.desc()).limit(window).all()
         for e in phishing_db:
             try:
                 reasons = json.loads(e.reasons_jsonb) if e.reasons_jsonb else []
@@ -45,11 +49,9 @@ def list_events(
             })
             
     if type is None or type == "fraud":
-        fraud_query = db.query(FraudEvent).filter(
-            FraudEvent.user_id == user.id
-        ).order_by(FraudEvent.created_at.desc())
-        
-        fraud_db = fraud_query.all()
+        fraud_base = db.query(FraudEvent).filter(FraudEvent.user_id == user.id)
+        total += fraud_base.count()
+        fraud_db = fraud_base.order_by(FraudEvent.created_at.desc()).limit(window).all()
         for e in fraud_db:
             try:
                 reasons = json.loads(e.reasons_jsonb) if e.reasons_jsonb else []
@@ -66,13 +68,8 @@ def list_events(
                 "created_at": e.created_at
             })
             
-    # Sort combined events by created_at descending
+    # Merge both feeds newest-first, then take the requested page.
     events.sort(key=lambda x: x["created_at"], reverse=True)
-    
-    # Get total BEFORE pagination
-    total = len(events)
-    
-    # Paginate only once (the DB queries already return all, we paginate the merged list)
     paginated_events = events[offset : offset + limit]
     
     return {

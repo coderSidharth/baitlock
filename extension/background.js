@@ -1,4 +1,5 @@
-const API_BASE = "http://localhost:8000/api/v1";
+importScripts("config.js");
+const API_BASE = BAITLOCK_CONFIG.API_BASE;
 
 function updateBadge(tabId, tier) {
     let color = "#5f6368";
@@ -42,7 +43,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     if (!url.startsWith("http://") && !url.startsWith("https://")) return;
 
     // Ignore internal pages: the Baitlock dashboard and block page
-    if (url.includes("localhost:3000") || url.includes("127.0.0.1:3000")) return;
+    if (baitlockIsAppUrl(url)) return;
 
     const { baitlock_token } = await chrome.storage.local.get(['baitlock_token']);
     
@@ -68,7 +69,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 
             // If threat is High or Critical, intercept and redirect
             if (data.tier === "high" || data.tier === "critical") {
-                const blockUrl = `http://localhost:3000/?blocked=true&url=${encodeURIComponent(url)}&score=${data.final_score}&tier=${data.tier}`;
+                const blockUrl = `${BAITLOCK_CONFIG.APP_ORIGIN}/?blocked=true&url=${encodeURIComponent(url)}&score=${data.final_score}&tier=${data.tier}`;
                 chrome.tabs.update(details.tabId, { url: blockUrl });
             }
             

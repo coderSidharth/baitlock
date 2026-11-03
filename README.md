@@ -85,3 +85,86 @@ To enable real-time phishing detection in your browser:
 2. Enable **Developer mode** in the top right corner.
 3. Click **Load unpacked** and select the `extension` folder located in the root of this project.
 4. The Baitlock Phishing Shield extension is now active!
+
+---
+
+## Phishing Detection Model
+
+The Layer-2 URL classifier ships pre-trained (`server/app/features/phishing/phishing_url_model.pkl`,
+v2.1.0, HistGradientBoostingClassifier). Full metrics, data sources and limitations are in
+[`model_card.json`](server/app/features/phishing/model_card.json).
+
+**Evaluation** — 35,151 held-out URLs from registered domains never seen in training:
+
+| Metric | Value |
+|---|---|
+| ROC-AUC | 0.9159 |
+| PR-AUC | 0.9435 |
+| Precision / recall / FPR at the blocking threshold (p ≥ 0.75) | 95.8% / 68.1% / 4.0% |
+| Precision / recall / FPR at p ≥ 0.90 | 98.4% / 57.0% / 1.2% |
+| End-to-end (rules + model + reputation): reference phishing URLs blocked | 52/52 |
+| End-to-end: real legitimate sites blocked (sign-in, OAuth, banking, wallets…) | 1/112 |
+
+The model is one signal among several: user block/allow lists always win, deterministic rules catch IPs,
+punycode, `user@host` tricks and plain HTTP, and the optional LLM layer analyses page content.
+
+### Retraining
+
+```bash
+cd server
+```
+```bash
+uv run python scripts/build_dataset.py --raw-dir /tmp/baitlock-raw
+```
+```bash
+uv run python train.py --compare
+```
+
+`build_dataset.py` downloads the public sources, de-duplicates and de-biases them (balanced classes, matched
+host-only/full-URL mix, per-domain caps, no cross-label conflicts) and regenerates the domain-reputation list.
+The build is deterministic. `train.py` prints the held-out metrics and an end-to-end check, then writes the
+model bundle and model card. The service validates the bundle's feature schema at startup and reports it at
+`GET /api/v1/health`.
+
+---
+
+## Production Deployment
+
+**Backend** (`server/.env`, see `server/.env.example`):
+
+| Variable | Production value |
+|---|---|
+| `ENVIRONMENT` | `production` — the server refuses to start without a strong `SECRET_KEY` or with a wildcard CORS origin |
+| `SECRET_KEY` | a stable random secret: `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
+| `ALLOWED_ORIGINS` | your dashboard origin(s), comma-separated, e.g. `https://app.example.com` |
+| `DATABASE_URL` | a PostgreSQL URL (SQLite runs in WAL mode and is fine for a single instance) |
+| `LLM_PROVIDER` / `GROQ_API_KEY` | optional content analysis; detection works without it |
+
+```bash
+uv run alembic upgrade head
+```
+```bash
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers
+```
+
+Serve it behind HTTPS. Failed logins are rate-limited per (IP, email); with several instances, also rate-limit
+at the reverse proxy because the in-process limiter is per worker.
+
+**Frontend** (`client/.env`, see `client/.env.example`): set `NEXT_PUBLIC_API_URL` to the public API URL, then
+
+```bash
+bun run build && bun run start
+```
+
+**Extension**: edit `extension/config.js` (`API_BASE`, `APP_ORIGIN`) and the matching `host_permissions` and
+`content_scripts.matches` entries in `extension/manifest.json`, then rebuild the downloadable package
+(`client/public/baitlock-extension.zip`).
+
+**Health check**: `GET /api/v1/health` returns `healthy` only when the database is reachable and the shipped
+model artifact loaded (not the fallback model).
+
+### Tests
+
+```bash
+cd server && uv run --with pytest python -m pytest -q tests
+```

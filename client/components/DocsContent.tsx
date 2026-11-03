@@ -156,8 +156,8 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
                 <span className="font-mono text-foreground font-medium">&lt; 1ms (Layer 1)</span>
               </div>
               <div className="flex justify-between py-1 border-b border-border">
-                <span>ML Model</span>
-                <span className="font-mono text-foreground font-medium">Isolation Forest</span>
+                <span>URL Model</span>
+                <span className="font-mono text-foreground font-medium">Gradient Boosting</span>
               </div>
               <div className="flex justify-between py-1">
                 <span>Framework</span>
@@ -245,11 +245,11 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
                   </div>
                   <h3 className="text-lg font-semibold mb-2">Machine Learning Classifier</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    If the rule engine does not immediately flag the input as highly critical, the data is passed to a machine learning model. The URL classifier is trained on the PhishTank dataset to identify malicious URL structures. The transaction model uses an Isolation Forest algorithm trained on synthetic behavioral data to detect anomalous spending patterns or geographic mismatches.
+                    If the rule engine does not immediately flag the input as highly critical, the data is passed to a machine learning model. The URL classifier is a gradient-boosted model trained on 200,000 URLs drawn from PhishTank, the Phishing.Database live feed and public benign corpora, and evaluated only on domains it never saw during training. A domain-reputation layer keeps established sites from being blocked on URL shape alone. The transaction model uses an Isolation Forest algorithm trained on synthetic behavioral data to detect anomalous spending patterns or geographic mismatches.
                   </p>
                 </div>
                 <div className="mt-5 pt-4 border-t border-border font-mono text-xs text-muted-foreground">
-                  PhishTank &amp; Isolation Forest
+                  Gradient Boosting &amp; Isolation Forest
                 </div>
               </div>
 

@@ -3,10 +3,14 @@ import { useState, useEffect } from "react";
 import { Ban, ShieldAlert, CheckCircle, Trash2 } from "lucide-react";
 import { API_V1_URL } from "@/lib/api";
 
+type DomainEntry = { domain?: string };
+type FeedEvent = { id: string; target: string; tier: string; score: number; verdict: string };
+type OverrideEntry = FeedEvent & { isExplicit?: boolean };
+
 export default function OverridesPage() {
     const [activeTab, setActiveTab] = useState<'blocklist' | 'whitelist'>('blocklist');
-    const [blockedEvents, setBlockedEvents] = useState<any[]>([]);
-    const [whitelist, setWhitelist] = useState<any[]>([]);
+    const [blockedEvents, setBlockedEvents] = useState<OverrideEntry[]>([]);
+    const [whitelist, setWhitelist] = useState<OverrideEntry[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -21,7 +25,7 @@ export default function OverridesPage() {
             // Build the set of whitelisted (trusted) domains so they are never shown
             // as blocked — a site marked safe must disappear from the blocklist.
             const whitelistDomains = new Set<string>(
-                (whitelistData.whitelist || []).map((w: any) => (w.domain || "").toLowerCase().replace(/\.$/, ""))
+                (whitelistData.whitelist || []).map((w: DomainEntry) => (w.domain || "").toLowerCase().replace(/\.$/, ""))
             );
             const hostOf = (target: string) => {
                 try {
@@ -40,12 +44,12 @@ export default function OverridesPage() {
             };
 
             const blocked = (eventsData.events || []).filter(
-                (e: any) => (e.tier === "high" || e.tier === "critical") && !isWhitelisted(e.target)
+                (e: FeedEvent) => (e.tier === "high" || e.tier === "critical") && !isWhitelisted(e.target)
             );
 
             const explicitBlocks = (blocklistData.blocklist || [])
-                .filter((b: any) => !whitelistDomains.has((b.domain || "").toLowerCase().replace(/\.$/, "")))
-                .map((b: any) => ({
+                .filter((b: DomainEntry) => !whitelistDomains.has((b.domain || "").toLowerCase().replace(/\.$/, "")))
+                .map((b: DomainEntry) => ({
                     id: `explicit_block_${b.domain}`,
                     target: b.domain,
                     tier: "critical",
@@ -56,7 +60,7 @@ export default function OverridesPage() {
 
             setBlockedEvents([...explicitBlocks, ...blocked]);
 
-            const explicitWhitelists = (whitelistData.whitelist || []).map((w: any) => ({
+            const explicitWhitelists = (whitelistData.whitelist || []).map((w: DomainEntry) => ({
                 id: `explicit_white_${w.domain}`,
                 target: w.domain,
                 tier: "safe",
