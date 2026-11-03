@@ -91,7 +91,7 @@ export default function LiveFeedPage() {
                         events.map((event) => {
                             const config = getTierConfig(event.tier);
                             return (
-                                <div key={event.id} className={`w-full p-5 rounded-[9px] border ${config.border} ${config.bg} backdrop-blur-sm shadow-xl transition-all hover:scale-[1.002] flex flex-col md:flex-row gap-4 justify-between`}>
+                                <div key={event.id} className={`w-full p-5 rounded-2xl border ${config.border} ${config.bg} backdrop-blur-sm shadow-xl hover-lift flex flex-col md:flex-row gap-4 justify-between`}>
                                     <div className="flex flex-col gap-3 flex-1 min-w-0">
                                         <div className="flex items-center gap-3">
                                             {config.icon}
@@ -125,7 +125,7 @@ export default function LiveFeedPage() {
                             );
                         })
                     ) : (
-                        <div className="p-10 rounded-[9px] border border-white/10 text-center flex flex-col items-center justify-center">
+                        <div className="p-12 rounded-2xl border border-dashed border-white/12 bg-white/[0.02] text-center flex flex-col items-center justify-center">
                             <span className="text-white/40 italic">Waiting for events...</span>
                         </div>
                     )}

@@ -94,7 +94,7 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
           {/* Navigation Items */}
           <div
             className="rounded-xl p-3 border border-white/10 shadow-xl flex flex-col gap-1"
-            style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}
+            style={{ background: "linear-gradient(156.55deg, #0c2a57 -42%, #06162f 116%)" }}
           >
             <div className="px-3 py-2 text-xs font-mono text-white/40 uppercase tracking-wider font-semibold">
               Documentation Nav
@@ -129,7 +129,7 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
           {/* Key Specs Widget */}
           <div
             className="rounded-xl p-5 border border-white/10 shadow-xl flex flex-col gap-3"
-            style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}
+            style={{ background: "linear-gradient(156.55deg, #0c2a57 -42%, #06162f 116%)" }}
           >
             <div className="flex items-center gap-2 text-amber-400 font-mono text-xs uppercase tracking-wider font-semibold">
               <Zap className="w-4 h-4" /> System Metrics
@@ -178,7 +178,7 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
             </div>
             <div
               className="p-6 lg:p-8 rounded-xl border border-white/10 shadow-xl leading-relaxed text-white/80 font-inter text-base space-y-4"
-              style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}
+              style={{ background: "linear-gradient(156.55deg, #0c2a57 -42%, #06162f 116%)" }}
             >
               <p>
                 Baitlock is a real-time, AI-powered phishing and fraud detection platform. It provides immediate analysis of URLs and financial transactions to block malicious activity before it reaches the end user.
@@ -347,7 +347,7 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
 
             <div
               className="p-6 lg:p-8 rounded-xl border border-white/10 shadow-xl leading-relaxed text-white/80 font-inter text-base space-y-4"
-              style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}
+              style={{ background: "linear-gradient(156.55deg, #0c2a57 -42%, #06162f 116%)" }}
             >
               <p>
                 Phishing attacks frequently target user credentials. Baitlock aligns with NIST Special Publication 800-63B by actively mitigating credential harvesting attempts.
@@ -375,7 +375,7 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
 
             <div
               className="p-6 lg:p-8 rounded-xl border border-white/10 shadow-xl space-y-6"
-              style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}
+              style={{ background: "linear-gradient(156.55deg, #0c2a57 -42%, #06162f 116%)" }}
             >
               <div className="space-y-4 font-inter text-sm">
                 {/* Step 1 */}
@@ -534,7 +534,7 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
 
             <div
               className="p-6 lg:p-8 rounded-xl border border-white/10 shadow-xl space-y-6"
-              style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}
+              style={{ background: "linear-gradient(156.55deg, #0c2a57 -42%, #06162f 116%)" }}
             >
               <h3 className="font-cormorant text-2xl font-bold text-white">
                 To install the extension:

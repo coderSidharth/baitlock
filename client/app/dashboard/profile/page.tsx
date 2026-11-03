@@ -229,7 +229,7 @@ export default function ProfilePage() {
           <button 
             onClick={handleSaveChanges}
             disabled={saving || loading}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-md bg-linear-to-r from-[#003882] to-[#0048A6] text-white font-inter text-sm font-medium hover:brightness-110 disabled:opacity-50 transition-all border border-white/10 shadow-[0_0_12px_rgba(0,30,100,0.4)] cursor-pointer"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-lg btn-primary text-white font-inter text-sm font-medium cursor-pointer"
           >
             <Save className="w-4 h-4" />
             {saving ? "Saving..." : "Save Changes"}
@@ -264,9 +264,8 @@ export default function ProfilePage() {
         
         {/* Left Column - Personal Info */}
         <div className="lg:col-span-5 2xl:col-span-4 flex flex-col gap-6">
-          <div className="rounded-[9px] p-6 lg:p-8 relative overflow-hidden group shadow-xl flex flex-col h-full"
-            style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}>
-            
+          <div className="surface-panel surface-panel-sheen p-6 lg:p-8 relative overflow-hidden group flex flex-col h-full">
+
             <div className="flex items-center gap-4 mb-8 relative z-10">
               <div className="w-20 h-20 rounded-full bg-linear-to-tr from-blue-600 to-indigo-500 p-[2px] shadow-[0_0_20px_rgba(37,99,235,0.3)]">
                 <div className="w-full h-full bg-[#001430] rounded-full flex items-center justify-center">
@@ -344,8 +343,7 @@ export default function ProfilePage() {
         <div className="lg:col-span-7 2xl:col-span-8 flex flex-col gap-6">
           
           {/* Active Sessions */}
-          <div className="rounded-[9px] p-6 lg:p-8 relative overflow-hidden shadow-xl"
-            style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}>
+          <div className="surface-panel p-6 lg:p-8 relative overflow-hidden">
             <div className="flex items-center gap-3 mb-6">
               <Smartphone className="w-8 h-8 text-white/80" />
               <div>
@@ -380,8 +378,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Security Settings */}
-          <div className="rounded-[9px] p-6 lg:p-8 relative overflow-hidden shadow-xl"
-            style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}>
+          <div className="surface-panel p-6 lg:p-8 relative overflow-hidden">
             <h3 className="font-cormorant font-bold text-[28px] leading-8.5 tracking-tight mb-6">Security Settings</h3>
             
             <div className="w-full">
@@ -410,9 +407,8 @@ export default function ProfilePage() {
       {/* Password Change Modal */}
       {showPasswordModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div 
-            className="w-full max-w-md rounded-xl p-6 sm:p-8 border border-white/10 shadow-[0_0_50px_rgba(0,40,120,0.4)] relative fade-in"
-            style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #00122A 114.03%)" }}
+          <div
+            className="w-full max-w-md surface-panel surface-panel-sheen p-6 sm:p-8 relative fade-in"
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
@@ -512,7 +508,7 @@ export default function ProfilePage() {
                 <button
                   type="submit"
                   disabled={isChangingPassword}
-                  className="px-5 py-2 text-sm font-medium text-white rounded-md bg-linear-to-r from-[#003882] to-[#0048A6] hover:brightness-110 disabled:opacity-50 border border-white/10 shadow-[0_0_12px_rgba(0,30,100,0.4)] transition-all cursor-pointer flex items-center gap-2"
+                  className="px-5 py-2 text-sm font-medium text-white rounded-lg btn-primary cursor-pointer flex items-center gap-2"
                 >
                   {isChangingPassword ? "Updating..." : "Update Password"}
                 </button>

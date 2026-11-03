@@ -115,12 +115,12 @@ export default function AIChatWidget() {
         <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
             {/* Chat Box */}
             {isOpen && (
-                <div 
-                    className="mb-4 w-87.5 sm:w-100 h-125 max-h-[70vh] rounded-[15px] shadow-2xl flex flex-col overflow-hidden border border-white/20 backdrop-blur-md transition-all duration-300 animate-in slide-in-from-bottom-5 opacity-100"
-                    style={{ background: "linear-gradient(180.03deg, #000D1F 5.53%, #00214D 122.03%)" }}
+                <div
+                    className="mb-4 w-87.5 sm:w-100 h-125 max-h-[70vh] rounded-2xl shadow-[0_30px_70px_-20px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden border border-white/12 backdrop-blur-md transition-all duration-300 animate-fade-in opacity-100"
+                    style={{ background: "linear-gradient(180.03deg, #050d1d 5.53%, #0a2047 122.03%)" }}
                 >
                     {/* Header */}
-                    <div className="p-4 bg-[#0048A6]/30 border-b border-white/10 flex justify-between items-center">
+                    <div className="p-4 bg-gradient-to-r from-blue-600/25 to-indigo-600/15 border-b border-white/10 flex justify-between items-center">
                         <div className="flex items-center gap-2 text-white">
                             <ShieldAlert size={18} className="text-blue-300" />
                             <span className="font-cormorant font-bold text-xl tracking-wide">Baitlock AI</span>
@@ -143,10 +143,10 @@ export default function AIChatWidget() {
                     <div className="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-4">
                         {chatMessages.map((msg) => (
                             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[92%] p-3.5 rounded-[12px] text-sm font-inter leading-relaxed shadow-lg ${
-                                    msg.role === 'user' 
-                                        ? 'bg-[#0048A6] text-white rounded-br-none' 
-                                        : 'bg-white/10 text-white/95 border border-white/10 rounded-bl-none'
+                                <div className={`max-w-[92%] p-3.5 rounded-2xl text-sm font-inter leading-relaxed shadow-lg ${
+                                    msg.role === 'user'
+                                        ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-br-md shadow-[0_8px_20px_-10px_rgba(37,99,235,0.7)]'
+                                        : 'bg-white/8 text-white/95 border border-white/10 rounded-bl-md'
                                 }`}>
                                     <MarkdownMessage content={msg.content} isUser={msg.role === 'user'} />
                                 </div>
@@ -198,13 +198,13 @@ export default function AIChatWidget() {
                             value={chatInput} 
                             onChange={(e) => setChatInput(e.target.value)} 
                             onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
-                            placeholder="Ask Baitlock..." 
-                            className="flex-1 bg-[#12141A] border border-white/10 text-white placeholder-white/30 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-white/30 transition-colors"
+                            placeholder="Ask Baitlock..."
+                            className="flex-1 bg-black/40 border border-white/10 text-white placeholder-white/30 rounded-lg px-3 py-2 text-sm focus:outline-none input-ring"
                         />
-                        <button 
-                            onClick={() => sendChatMessage()} 
+                        <button
+                            onClick={() => sendChatMessage()}
                             disabled={loading || !chatInput.trim()}
-                            className="px-3 py-2 bg-[#0048A6] hover:bg-[#003882] disabled:opacity-50 text-white rounded-md transition-colors flex items-center justify-center cursor-pointer"
+                            className="px-3 py-2 btn-primary disabled:opacity-50 text-white rounded-lg flex items-center justify-center cursor-pointer"
                         >
                             <Send size={16} />
                         </button>
@@ -213,9 +213,9 @@ export default function AIChatWidget() {
             )}
 
             {/* Toggle Button */}
-            <button 
+            <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-14 h-14 bg-linear-to-r from-[#003882] to-[#0048A6] hover:brightness-110 text-white rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(0,113,255,0.4)] border border-white/20 transition-transform hover:scale-105 active:scale-95"
+                className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 hover:brightness-110 text-white rounded-full flex items-center justify-center shadow-[0_10px_30px_-6px_rgba(37,99,235,0.6)] border border-white/20 transition-transform hover:scale-105 active:scale-95"
             >
                 {isOpen ? <X size={24} /> : <MessageSquare size={24} />}
             </button>

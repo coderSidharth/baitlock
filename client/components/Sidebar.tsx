@@ -46,11 +46,14 @@ export default function Sidebar() {
     };
 
     return (
-        <aside className={`shrink-0 h-auto lg:h-full rounded-b-2xl lg:rounded-none flex flex-col justify-between relative overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-full lg:w-20 p-4' : 'w-full lg:w-60 p-4 lg:p-6'} bg-zinc-950/40 backdrop-blur-2xl border-r border-b lg:border-b-0 border-white/5 z-20`}>
+        <aside className={`shrink-0 h-auto lg:h-full rounded-b-2xl lg:rounded-none flex flex-col justify-between relative overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-full lg:w-20 p-4' : 'w-full lg:w-60 p-4 lg:p-6'} surface-glass border-r border-b lg:border-b-0 z-20`}>
             <div className="relative z-10 w-full flex flex-col h-full">
                 <div className={`flex ${isCollapsed ? 'flex-col gap-4 items-center justify-start' : 'flex-row items-center justify-between'} mb-2 lg:mb-10`}>
                     {!isCollapsed && (
-                        <Link href="/" className="font-inter text-2xl font-bold tracking-tight text-zinc-100 block hover:opacity-80 transition-opacity">Baitlock</Link>
+                        <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+                            <Image src="/baitlock-logo.png" alt="Baitlock" width={30} height={30} className="w-7.5 h-7.5 object-contain drop-shadow-[0_0_10px_rgba(37,99,235,0.4)]" />
+                            <span className="font-inter text-2xl font-bold tracking-tight text-zinc-100">Baitlock</span>
+                        </Link>
                     )}
                     
                     <div className="flex items-center gap-2">
@@ -76,9 +79,12 @@ export default function Sidebar() {
                     {navItems.map((item) => (
                         <Link key={item.href} href={item.href}
                             title={isCollapsed ? item.label : undefined}
-                            className={`shrink-0 lg:w-full flex items-center ${isCollapsed ? 'justify-center px-0 py-3' : 'gap-3 px-4 py-2.5'} rounded-xl transition-all duration-200 cursor-pointer
-                ${pathname === item.href ? 'text-zinc-100 bg-white/10 font-medium shadow-sm' : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5 font-normal'}`}>
-                            <div className={`flex items-center justify-center ${pathname === item.href ? 'text-blue-400' : ''}`}>
+                            className={`group relative shrink-0 lg:w-full flex items-center ${isCollapsed ? 'justify-center px-0 py-3' : 'gap-3 px-4 py-2.5'} rounded-xl transition-all duration-200 cursor-pointer
+                ${pathname === item.href ? 'text-zinc-100 font-medium bg-gradient-to-r from-blue-500/20 to-indigo-500/5 border border-blue-400/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]' : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5 font-normal border border-transparent'}`}>
+                            {pathname === item.href && !isCollapsed && (
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.8)]" />
+                            )}
+                            <div className={`flex items-center justify-center transition-colors ${pathname === item.href ? 'text-blue-300' : 'group-hover:text-blue-300/70'}`}>
                                 {item.icon}
                             </div>
                             {!isCollapsed && <span className="font-inter text-[14px] tracking-wide whitespace-nowrap">{item.label}</span>}

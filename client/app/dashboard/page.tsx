@@ -163,8 +163,7 @@ export default function DashboardPage() {
         <div className="lg:col-span-4 2xl:col-span-3 flex flex-col gap-6">
 
           {/* Pipeline Health */}
-          <div className="grow rounded-[9px] p-6 flex flex-col relative overflow-hidden group shadow-xl"
-            style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}>
+          <div className="grow surface-panel surface-panel-sheen p-6 flex flex-col relative overflow-hidden group">
             <h3 className="font-medium text-[24px] leading-7.5 tracking-tight relative z-10">Avg Security<br />Score</h3>
             <div className="my-auto relative z-10 flex flex-col items-center w-full mt-4">
               <div className="font-cormorant text-[42px] leading-10.5 font-bold">{averageScore}%</div>
@@ -178,8 +177,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Module Status */}
-          <div className="grow rounded-[9px] p-6 relative overflow-hidden group shadow-xl flex flex-col"
-            style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}>
+          <div className="grow surface-panel p-6 relative overflow-hidden group flex flex-col">
             <h3 className="font-medium text-[24px] leading-7.5 tracking-tight relative z-10 mb-4">Module<br />Status</h3>
             <div className="my-auto flex flex-col gap-3 z-10 w-full">
               <StatusItem label="Ingestion" status={events.length > 0 ? "ok" : "warning"} />
@@ -189,8 +187,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Blocked Sites */}
-          <div className="rounded-[9px] p-5 relative overflow-hidden shadow-xl flex flex-col gap-3"
-            style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}>
+          <div className="surface-panel p-5 relative overflow-hidden flex flex-col gap-3">
             <h3 className="font-medium text-[18px] leading-5.5 tracking-tight relative z-10 flex items-center gap-2 mb-2">
               <Ban className="w-5 h-5 text-red-400" />
               Blocked Sites
@@ -210,8 +207,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Middle Column - AI Forecast */}
-        <div className="lg:col-span-8 2xl:col-span-5 rounded-[9px] p-5 lg:p-8 flex flex-col shadow-xl min-h-100 max-h-200"
-          style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}>
+        <div className="lg:col-span-8 2xl:col-span-5 surface-panel p-5 lg:p-8 flex flex-col min-h-100 max-h-200">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 shrink-0">
             <h3 className="font-cormorant font-bold text-[28px] leading-8.5 tracking-tight">AI Forecast</h3>
             <div className="flex flex-wrap gap-4 sm:gap-2">
@@ -255,8 +251,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Right Column - AI Insight */}
-        <div className="lg:col-span-12 2xl:col-span-4 rounded-[9px] p-5 lg:p-8 flex flex-col shadow-xl"
-          style={{ background: "linear-gradient(156.55deg, #00214D -46.3%, #001C40 114.03%)" }}>
+        <div className="lg:col-span-12 2xl:col-span-4 surface-panel p-5 lg:p-8 flex flex-col">
           <h3 className="font-cormorant font-bold text-[28px] leading-8.5 tracking-tight mb-8">AI Insight</h3>
           <div className="flex-1 flex flex-col gap-6 relative">
             {showLogs ? (
@@ -306,7 +301,7 @@ export default function DashboardPage() {
       {/* Fraud Simulation Modal */}
       {showFraudModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-2xl bg-[#001736] border border-[#0048A6]/40 rounded-xl shadow-[0_0_50px_rgba(0,30,80,0.8)] p-6 md:p-8 overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="relative w-full max-w-2xl surface-panel surface-panel-sheen p-6 md:p-8 overflow-hidden max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-[#0048A6]/20 border border-[#0048A6]/40">
@@ -527,22 +522,28 @@ function BlockedSite({ domain, reason }: { domain: string, reason: string }) {
 }
 
 function FeedCard({ label, domain, score, tags, type }: { label: string, domain: string, score: number, tags: string[], type: string }) {
-  const bgStyle = { background: "radial-gradient(100% 150% at 50% 50%, #3C3C3C 0%, #28292B 60%, #1E2022 100%)" };
-  const borderColor = type === 'phishing' ? 'border-red-500/30' : type === 'fraud' ? 'border-amber-500/30' : 'border-white/5';
+  const accent = type === 'phishing'
+    ? { border: 'border-red-500/30', dot: 'bg-red-400', text: 'text-red-300' }
+    : type === 'fraud'
+    ? { border: 'border-amber-500/30', dot: 'bg-amber-400', text: 'text-amber-300' }
+    : { border: 'border-white/8', dot: 'bg-emerald-400', text: 'text-emerald-300' };
 
   return (
-    <div className={`p-6 rounded-[9px] border hover:border-white/30 transition-all cursor-pointer group shadow-xl ${borderColor}`} style={bgStyle}>
+    <div className={`surface-card hover-lift p-6 cursor-pointer group ${accent.border}`}>
       <div className="flex justify-between items-start mb-4">
-        <h4 className="font-inter font-medium text-[20px] leading-6 text-white tracking-tight">{label}</h4>
+        <h4 className="font-inter font-medium text-[20px] leading-6 text-white tracking-tight flex items-center gap-2.5">
+          <span className={`w-2 h-2 rounded-full ${accent.dot} shadow-[0_0_8px_currentColor]`} />
+          {label}
+        </h4>
       </div>
-      <div className="font-mono text-[14px] leading-5 tracking-tight text-white mb-6 underline hover:text-[#a5c7fc] transition-colors break-all opacity-90">{domain}</div>
+      <div className="font-mono text-[14px] leading-5 tracking-tight text-white mb-6 underline decoration-white/20 underline-offset-4 group-hover:text-[#a5c7fc] group-hover:decoration-[#a5c7fc]/50 transition-colors break-all opacity-90">{domain}</div>
       <div className="flex flex-wrap gap-2 items-center">
-        <div className="flex items-center bg-[#111111]/90 rounded border border-white/5 px-2 py-0.5 shadow-inner mr-2">
+        <div className="flex items-center bg-black/50 rounded-md border border-white/8 px-2.5 py-1 shadow-inner mr-2">
           <span className="font-mono text-lg font-bold text-white mr-2">{score}</span>
           <span className="text-[10px] text-white/60 font-inter uppercase tracking-widest leading-none mt-0.5">Score</span>
         </div>
         {tags.map((tag, i) => (
-          <span key={i} className="font-mono text-[14px] px-2 py-0.5 rounded bg-black/40 border border-white/10 text-white/80 whitespace-nowrap">
+          <span key={i} className={`font-mono text-[13px] px-2 py-0.5 rounded-md bg-black/40 border border-white/10 ${accent.text} whitespace-nowrap`}>
             [!] {tag}
           </span>
         ))}

@@ -6,9 +6,53 @@
   --font-mono: var(--font-mono);
 }
 
+/* ============================================================
+   Baitlock design tokens
+   Central palette + surface definitions. Presentation only.
+   ============================================================ */
+:root {
+  /* Base canvas */
+  --bl-bg: #070910;
+  --bl-bg-soft: #0b0e18;
+
+  /* Brand accents */
+  --bl-accent: #2f6fe0;
+  --bl-accent-strong: #1b4fb8;
+  --bl-accent-soft: #0048a6;
+  --bl-cyan: #38d6f0;
+
+  /* Panel (primary navy surface) */
+  --bl-panel-from: #0c2a57;
+  --bl-panel-to: #06162f;
+  --bl-panel-border: rgba(120, 170, 255, 0.12);
+
+  /* Card (neutral slate surface used for list/feed items) */
+  --bl-card-from: #1b2436;
+  --bl-card-mid: #131a29;
+  --bl-card-to: #0b1019;
+  --bl-card-border: rgba(255, 255, 255, 0.08);
+
+  /* Hairlines + shadows */
+  --bl-hairline: rgba(255, 255, 255, 0.08);
+  --bl-shadow: 0 20px 48px -22px rgba(0, 0, 0, 0.7);
+  --bl-shadow-soft: 0 12px 30px -18px rgba(0, 0, 0, 0.55);
+  --bl-ring: rgba(47, 111, 224, 0.55);
+}
+
 @layer base {
   body {
-    @apply font-sans bg-[#09090b] text-zinc-100;
+    @apply font-sans text-zinc-100;
+    background-color: var(--bl-bg);
+  }
+
+  /* Smoother, consistent focus treatment for inputs/buttons */
+  :focus-visible {
+    outline: none;
+  }
+
+  ::selection {
+    background: rgba(47, 111, 224, 0.35);
+    color: #fff;
   }
 }
 
@@ -24,8 +68,99 @@
   font-family: var(--font-mono), monospace;
 }
 
+/* ============================================================
+   Reusable surface + control classes
+   ============================================================ */
+
+/* Primary navy panel — replaces the repeated inline linear-gradient */
+.surface-panel {
+  position: relative;
+  background: linear-gradient(156.55deg, var(--bl-panel-from) -42%, var(--bl-panel-to) 116%);
+  border: 1px solid var(--bl-panel-border);
+  border-radius: 16px;
+  box-shadow: var(--bl-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Subtle top sheen for panels that opt in */
+.surface-panel-sheen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(120% 60% at 50% -10%, rgba(99, 160, 255, 0.14), transparent 60%);
+  pointer-events: none;
+}
+
+/* Neutral slate card — replaces the grey radial feed-card gradient */
+.surface-card {
+  background: radial-gradient(130% 150% at 50% 0%, var(--bl-card-from) 0%, var(--bl-card-mid) 55%, var(--bl-card-to) 100%);
+  border: 1px solid var(--bl-card-border);
+  border-radius: 14px;
+}
+
+/* Glass navigation / chrome surface */
+.surface-glass {
+  background: rgba(10, 14, 24, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: var(--bl-hairline);
+}
+
+/* Interactive lift for cards/rows */
+.hover-lift {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 26px 54px -26px rgba(0, 0, 0, 0.8);
+}
+
+/* Buttons */
+.btn-primary {
+  background: linear-gradient(180deg, #3576e6 0%, #1b4fb8 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 24px -12px rgba(47, 111, 224, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: filter 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+.btn-primary:active {
+  transform: translateY(1px);
+}
+.btn-primary:disabled {
+  filter: none;
+  opacity: 0.55;
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Shared input focus ring */
+.input-ring {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.input-ring:focus {
+  border-color: var(--bl-accent);
+  box-shadow: 0 0 0 3px rgba(47, 111, 224, 0.2);
+}
+
+/* ============================================================
+   Scrollbars
+   ============================================================ */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
+  height: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -33,14 +168,25 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
 }
 
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ============================================================
+   Animations
+   ============================================================ */
 .fade-in {
   animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -56,6 +202,21 @@
   }
 }
 
+.animate-fade-in {
+  animation: fadeInScale 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes shine {
   0% {
     transform: translateX(-150%) skewX(12deg);
@@ -67,4 +228,15 @@
 
 .animate-shine {
   animation: shine 3s infinite linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in,
+  .animate-fade-in,
+  .animate-shine {
+    animation: none;
+  }
+  .hover-lift {
+    transition: none;
+  }
 }

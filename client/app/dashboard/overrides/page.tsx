@@ -54,16 +54,16 @@ export default function OverridesPage() {
             <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 md:mb-10 pl-2 lg:pl-6 xl:pl-10">
                 <h2 className="font-cormorant text-[48px] md:text-[64px] leading-14.5 md:leading-19.5 font-bold tracking-tight mb-4 md:mb-0">Overrides</h2>
                 
-                <div className="flex bg-[#001C40] p-1 rounded-[9px] shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]">
+                <div className="flex surface-glass border p-1 rounded-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]">
                     <button 
                         onClick={() => setActiveTab('blocklist')}
-                        className={`px-6 py-2 rounded-md font-inter text-[14px] font-medium transition-all ${activeTab === 'blocklist' ? 'bg-[#0048A6] text-white shadow-[0_2px_8px_rgba(0,0,0,0.3)]' : 'text-white/50 hover:text-white'}`}
+                        className={`px-6 py-2 rounded-md font-inter text-[14px] font-medium transition-all ${activeTab === 'blocklist' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-[0_6px_16px_-6px_rgba(37,99,235,0.7)]' : 'text-white/50 hover:text-white'}`}
                     >
                         Blocklist ({blockedEvents.length})
                     </button>
                     <button 
                         onClick={() => setActiveTab('whitelist')}
-                        className={`px-6 py-2 rounded-md font-inter text-[14px] font-medium transition-all ${activeTab === 'whitelist' ? 'bg-[#0048A6] text-white shadow-[0_2px_8px_rgba(0,0,0,0.3)]' : 'text-white/50 hover:text-white'}`}
+                        className={`px-6 py-2 rounded-md font-inter text-[14px] font-medium transition-all ${activeTab === 'whitelist' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-[0_6px_16px_-6px_rgba(37,99,235,0.7)]' : 'text-white/50 hover:text-white'}`}
                     >
                         Whitelist ({whitelist.length})
                     </button>
@@ -77,8 +77,7 @@ export default function OverridesPage() {
                     ) : activeTab === 'blocklist' ? (
                         blockedEvents.length > 0 ? (
                             blockedEvents.map((event) => (
-                                <div key={event.id} className="p-6 rounded-[9px] border border-red-500/40 bg-red-500/5 backdrop-blur-sm shadow-xl transition-all hover:scale-[1.005] cursor-pointer"
-                                    style={{ background: "radial-gradient(100% 150% at 50% 50%, #3C3C3C 0%, #28292B 60%, #1E2022 100%)" }}>
+                                <div key={event.id} className="surface-card hover-lift p-6 border border-red-500/40 cursor-pointer">
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center gap-3">
                                             <Ban className="w-5 h-5 text-red-400" />
@@ -139,7 +138,7 @@ export default function OverridesPage() {
                                 </div>
                             ))
                         ) : (
-                            <div className="p-10 rounded-[9px] border border-white/10 text-center flex flex-col items-center justify-center">
+                            <div className="p-12 rounded-2xl border border-dashed border-white/12 bg-white/[0.02] text-center flex flex-col items-center justify-center">
                                 <ShieldAlert className="w-12 h-12 text-white/20 mb-4" />
                                 <h3 className="text-xl font-medium text-white/60 mb-2">No Active Blocks</h3>
                                 <p className="text-white/40 text-sm">Active Shield has not intercepted any critical threats yet.</p>
@@ -148,8 +147,8 @@ export default function OverridesPage() {
                     ) : (
                         whitelist.length > 0 ? (
                             whitelist.map((item) => (
-                                <div key={item.id} className="p-6 rounded-[9px] border border-green-500/40 bg-green-500/5 backdrop-blur-sm shadow-xl transition-all hover:scale-[1.005] cursor-pointer"
-                                    style={{ background: "radial-gradient(100% 150% at 50% 50%, #1A2E20 0%, #122116 60%, #0A130C 100%)" }}>
+                                <div key={item.id} className="hover-lift p-6 rounded-2xl border border-green-500/40 backdrop-blur-sm shadow-xl cursor-pointer"
+                                    style={{ background: "radial-gradient(130% 150% at 50% 0%, #15351f 0%, #0e2416 55%, #081209 100%)" }}>
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center gap-3">
                                             <CheckCircle className="w-5 h-5 text-green-400" />
@@ -187,7 +186,7 @@ export default function OverridesPage() {
                                 </div>
                             ))
                         ) : (
-                            <div className="p-10 rounded-[9px] border border-white/10 text-center flex flex-col items-center justify-center">
+                            <div className="p-12 rounded-2xl border border-dashed border-white/12 bg-white/[0.02] text-center flex flex-col items-center justify-center">
                                 <ShieldAlert className="w-12 h-12 text-white/20 mb-4" />
                                 <h3 className="text-xl font-medium text-white/60 mb-2">No Whitelisted Sites</h3>
                                 <p className="text-white/40 text-sm">You haven't manually trusted any blocked domains yet.</p>
