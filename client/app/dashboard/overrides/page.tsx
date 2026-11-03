@@ -18,16 +18,41 @@ export default function OverridesPage() {
             fetch(`${API_V1_URL}/phishing/whitelist`, { headers }).then(r => r.ok ? r.json() : { whitelist: [] }).catch(() => ({ whitelist: [] }))
         ])
         .then(([eventsData, blocklistData, whitelistData]) => {
-            const blocked = (eventsData.events || []).filter((e: any) => e.tier === "high" || e.tier === "critical");
+            // Build the set of whitelisted (trusted) domains so they are never shown
+            // as blocked — a site marked safe must disappear from the blocklist.
+            const whitelistDomains = new Set<string>(
+                (whitelistData.whitelist || []).map((w: any) => (w.domain || "").toLowerCase().replace(/\.$/, ""))
+            );
+            const hostOf = (target: string) => {
+                try {
+                    const u = new URL(target.includes("://") ? target : `http://${target}`);
+                    return u.hostname.toLowerCase().replace(/\.$/, "");
+                } catch {
+                    return (target || "").toLowerCase().replace(/\.$/, "");
+                }
+            };
+            const isWhitelisted = (target: string) => {
+                const h = hostOf(target);
+                for (const wd of whitelistDomains) {
+                    if (wd && (h === wd || h.endsWith(`.${wd}`))) return true;
+                }
+                return false;
+            };
 
-            const explicitBlocks = (blocklistData.blocklist || []).map((b: any) => ({
-                id: `explicit_block_${b.domain}`,
-                target: b.domain,
-                tier: "critical",
-                score: 100,
-                verdict: "Blocked manually by user",
-                isExplicit: true
-            }));
+            const blocked = (eventsData.events || []).filter(
+                (e: any) => (e.tier === "high" || e.tier === "critical") && !isWhitelisted(e.target)
+            );
+
+            const explicitBlocks = (blocklistData.blocklist || [])
+                .filter((b: any) => !whitelistDomains.has((b.domain || "").toLowerCase().replace(/\.$/, "")))
+                .map((b: any) => ({
+                    id: `explicit_block_${b.domain}`,
+                    target: b.domain,
+                    tier: "critical",
+                    score: 100,
+                    verdict: "Blocked manually by user",
+                    isExplicit: true
+                }));
 
             setBlockedEvents([...explicitBlocks, ...blocked]);
 

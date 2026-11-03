@@ -15,6 +15,49 @@ def normalize_domain(value: str) -> str:
     parsed = urlparse(candidate if "://" in candidate else f"//{candidate}")
     return (parsed.hostname or candidate.split("/", 1)[0].split(":", 1)[0]).lower().rstrip(".")
 
+
+def set_whitelisted(db: Session, user_id: int, domain: str) -> str:
+    """Add a domain to the user's whitelist, removing it from the blocklist.
+
+    Whitelist and blocklist are mutually exclusive: a domain can only ever be on
+    one of them for a given user, so trusting a site also un-blocks it.
+    """
+    domain = normalize_domain(domain)
+    # Remove any conflicting blocklist entry first (mutual exclusivity)
+    db.query(UserBlocklist).filter(
+        UserBlocklist.user_id == user_id,
+        UserBlocklist.domain == domain
+    ).delete(synchronize_session=False)
+    existing = db.query(UserWhitelist).filter(
+        UserWhitelist.user_id == user_id,
+        UserWhitelist.domain == domain
+    ).first()
+    if not existing:
+        db.add(UserWhitelist(user_id=user_id, domain=domain))
+    db.commit()
+    return domain
+
+
+def set_blocklisted(db: Session, user_id: int, domain: str) -> str:
+    """Add a domain to the user's blocklist, removing it from the whitelist.
+
+    Mutual exclusivity mirror of set_whitelisted: blocking a site also un-trusts it.
+    """
+    domain = normalize_domain(domain)
+    # Remove any conflicting whitelist entry first (mutual exclusivity)
+    db.query(UserWhitelist).filter(
+        UserWhitelist.user_id == user_id,
+        UserWhitelist.domain == domain
+    ).delete(synchronize_session=False)
+    existing = db.query(UserBlocklist).filter(
+        UserBlocklist.user_id == user_id,
+        UserBlocklist.domain == domain
+    ).first()
+    if not existing:
+        db.add(UserBlocklist(user_id=user_id, domain=domain))
+    db.commit()
+    return domain
+
 def strip_tags(html: str) -> str:
     text = re.sub(r'<[^>]+>', ' ', html)
     return ' '.join(text.split())

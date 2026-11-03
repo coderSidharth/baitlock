@@ -4,6 +4,12 @@ from urllib.parse import urlparse
 import jellyfish
 import tldextract
 
+# Use the bundled Public Suffix List snapshot only. Passing suffix_list_urls=()
+# prevents tldextract from making a blocking network call to publicsuffix.org at
+# request time, which would add latency to the navigation-blocking fast path and
+# fail noisily in offline/restricted deployments.
+_tld_extract = tldextract.TLDExtract(suffix_list_urls=())
+
 # Top targeted brands for quick Levenshtein matching and embedding detection
 TOP_BRANDS = [
     "paypal", "apple", "microsoft", "netflix", "amazon", "google", 
@@ -52,7 +58,7 @@ def extract_url_features(url: str) -> dict:
     brand_match = 0 # 1 if legit exact match, 0 if not
     embedded_brand = 0 # 1 if brand is deceptively embedded
     
-    ext = tldextract.extract(normalized_url)
+    ext = _tld_extract(normalized_url)
     registered_domain = ext.domain.lower()  # e.g. "paypal" from "www.paypal.com"
     domain_lower = domain.lower()
 
