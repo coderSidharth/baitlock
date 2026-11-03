@@ -10,12 +10,7 @@ if str(server_dir) not in sys.path:
 from app.features.phishing.service import score_phishing_service
 from app.features.fraud.service import score_transaction_service
 from app.core.database import SessionLocal, engine, Base
-# Ensure all models are registered with Base metadata
-from app.features.auth import models as auth_models
-from app.features.phishing import models as phishing_models
-from app.features.fraud import models as fraud_models
-from app.features.chat import models as chat_models
-from app.features.companies import models as companies_models
+import app.models  # noqa: F401 -- registers every ORM model on Base.metadata
 
 def run_tests():
     # Ensure database schema is ready

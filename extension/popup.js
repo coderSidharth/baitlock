@@ -29,6 +29,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const flagLegitBtn = document.getElementById('flag-legit-btn');
     const flagMaliciousBtn = document.getElementById('flag-malicious-btn');
     const flagStatus = document.getElementById('flag-status');
+    const flagSection = document.getElementById('flag-section');
+
+    // Tabs & Fraud Elements
+    const tabPhishing = document.getElementById('tab-phishing');
+    const tabFraud = document.getElementById('tab-fraud');
+    const sectionPhishing = document.getElementById('section-phishing');
+    const sectionFraud = document.getElementById('section-fraud');
+    const fraudForm = document.getElementById('fraud-form');
+    const fraudAmount = document.getElementById('fraud-amount');
+    const fraudVelocity = document.getElementById('fraud-velocity');
+    const fraudDistance = document.getElementById('fraud-distance');
+    const fraudBtn = document.getElementById('fraud-btn');
+    const fraudSpinner = document.getElementById('fraud-spinner');
 
     let currentTab = null;
     let currentDomain = null;
@@ -262,6 +275,102 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // Tab Switching Logic
+    tabPhishing.addEventListener('click', () => {
+        tabPhishing.classList.add('active');
+        tabFraud.classList.remove('active');
+        sectionPhishing.style.display = 'block';
+        sectionFraud.style.display = 'none';
+        errorContainer.classList.add('hidden');
+        if (!resultContainer.classList.contains('hidden')) {
+            flagSection.classList.remove('hidden');
+        }
+    });
+
+    tabFraud.addEventListener('click', async () => {
+        tabFraud.classList.add('active');
+        tabPhishing.classList.remove('active');
+        sectionFraud.style.display = 'block';
+        sectionPhishing.style.display = 'none';
+        errorContainer.classList.add('hidden');
+        flagSection.classList.add('hidden');
+
+        // Suggest amount from current active page if available
+        if (!fraudAmount.value && currentTab && currentTab.id) {
+            try {
+                const res = await chrome.scripting.executeScript({
+                    target: { tabId: currentTab.id },
+                    func: () => {
+                        const match = document.body.innerText.match(/\$\s?([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?)/);
+                        return match ? match[1].replace(/,/g, '') : null;
+                    }
+                });
+                if (res && res[0] && res[0].result) {
+                    fraudAmount.placeholder = `Detected $${res[0].result}`;
+                }
+            } catch (_) {}
+        }
+    });
+
+    // Transaction Fraud Scoring Handler
+    fraudForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const amount = parseFloat(fraudAmount.value);
+        if (isNaN(amount) || amount <= 0) {
+            showError("Please enter a valid transaction amount.");
+            return;
+        }
+
+        const velocity = parseInt(fraudVelocity.value, 10) || 1;
+        const geoDistance = parseFloat(fraudDistance.value) || 0.0;
+        const hour = new Date().getHours();
+
+        fraudBtn.disabled = true;
+        fraudBtn.querySelector('.btn-text').classList.add('hidden');
+        fraudSpinner.classList.remove('hidden');
+        errorContainer.classList.add('hidden');
+
+        try {
+            const headers = { "Content-Type": "application/json" };
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+
+            const response = await fetch(`${API_BASE}/fraud/score`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                    transaction: {
+                        amount: amount,
+                        velocity: velocity,
+                        hour: hour,
+                        geo_distance: geoDistance
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                let errMsg = `Server error (${response.status})`;
+                try {
+                    const errBody = await response.json();
+                    const detail = errBody.detail;
+                    if (typeof detail === 'string') errMsg = detail;
+                    else if (Array.isArray(detail)) errMsg = detail.map(d => d.msg || JSON.stringify(d)).join(', ');
+                } catch (_) {}
+                throw new Error(errMsg);
+            }
+
+            const data = await response.json();
+            renderResult(data);
+            flagSection.classList.add('hidden'); // Transactions don't use domain community review
+
+        } catch (error) {
+            showError("Transaction check failed: " + error.message);
+        } finally {
+            fraudBtn.disabled = false;
+            fraudBtn.querySelector('.btn-text').classList.remove('hidden');
+            fraudSpinner.classList.add('hidden');
+        }
+    });
+
     // Flagging Logic
     const sendFlag = async (flagType, endpoint, payload) => {
         if (!currentDomain || !token) return;
@@ -377,7 +486,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('breakdown-container').classList.remove('hidden');
             document.getElementById('bd-rule').textContent = data.breakdown.rule_score || 0;
             document.getElementById('bd-ml').textContent = data.breakdown.ml_score || 0;
-            document.getElementById('bd-llm').textContent = data.breakdown.llm_score || 0;
+            const llmEl = document.getElementById('bd-llm');
+            const llmRow = llmEl ? llmEl.parentElement : null;
+            if (llmRow) {
+                if (data.breakdown.llm_score) {
+                    llmRow.style.display = 'flex';
+                    llmEl.textContent = data.breakdown.llm_score;
+                } else {
+                    llmRow.style.display = 'none';
+                }
+            }
         } else {
             document.getElementById('breakdown-container').classList.add('hidden');
         }

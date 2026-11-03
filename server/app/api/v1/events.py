@@ -4,7 +4,7 @@ from app.api.deps import get_db, get_current_user
 from app.features.auth.models import User
 from app.features.phishing.models import PhishingEvent
 from app.features.fraud.models import FraudEvent
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 import json
 

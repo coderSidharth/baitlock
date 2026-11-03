@@ -1,4 +1,3 @@
-import os
 import pickle
 import numpy as np
 from pathlib import Path
@@ -141,7 +140,7 @@ def train_and_evaluate_model():
     rec = recall_score(y_test, y_pred, zero_division=0)
     f1 = f1_score(y_test, y_pred, zero_division=0)
 
-    print(f"[ML Model] Layer 2 Classifier Trained — Held-out Evaluation:")
+    print("[ML Model] Layer 2 Classifier Trained — Held-out Evaluation:")
     print(f"           Precision: {prec:.4f} | Recall: {rec:.4f} | F1: {f1:.4f}")
 
     try:
@@ -182,7 +181,12 @@ def predict_phishing_ml(url: str) -> dict:
     features_array = [list(features_dict.values())]
     
     # Predict probability of class 1 (phishing)
-    prob = model.predict_proba(features_array)[0][1]
+    proba = model.predict_proba(features_array)[0]
+    # Handle models trained on a single class
+    if proba.shape[0] > 1:
+        prob = proba[1]
+    else:
+        prob = proba[0] if model.classes_[0] == 1 else 1 - proba[0]
     
     # Feature contributions for explainable AI telemetry
     reasons = []
@@ -198,8 +202,28 @@ def predict_phishing_ml(url: str) -> dict:
         reasons.append("Unusually high character entropy in domain (random-looking string)")
     if features_dict['has_https'] == 0:
         reasons.append("Insecure HTTP transport")
-        
+    if features_dict.get('suspicious_tld'):
+        reasons.append("Domain uses a suspicious TLD commonly associated with phishing")
+    if features_dict.get('has_punycode'):
+        reasons.append("Domain uses Punycode (possible homograph attack)")
+    if features_dict.get('num_subdomains', 0) >= 3:
+        reasons.append("Excessive subdomain nesting")
+
+    # Lower threshold to 0.40 — for a security tool, missing phishing is worse than a false alarm
+    score = int((1.0 - prob) * 100)
+    # Bias toward detection: if prob >= 0.40, treat as phishing unless it's a verified legitimate brand
+    is_legit_brand = (
+        features_dict.get('exact_brand_match') == 1 
+        and features_dict.get('embedded_brand') == 0 
+        and not features_dict.get('suspicious_tld') 
+        and not features_dict.get('has_punycode')
+    )
+    if is_legit_brand:
+        score = max(score, 90)
+    elif prob >= 0.40:
+        score = min(score, 45)
+
     return {
-        "ml_score": int((1.0 - prob) * 100),
+        "ml_score": score,
         "ml_reasons": reasons
     }

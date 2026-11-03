@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.pool import StaticPool
 from app.core.config import settings
 
 # Configure connection parameters based on database dialect.

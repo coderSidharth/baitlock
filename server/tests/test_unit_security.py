@@ -10,11 +10,11 @@ if str(server_dir) not in sys.path:
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.database import Base
+import app.models  # noqa: F401 -- registers every ORM model on Base.metadata
 from app.common.rule_engine import rule_check_phishing, rule_check_transaction
 from app.features.phishing.features import extract_url_features, shannon_entropy
 from app.features.phishing.service import _is_safe_url, score_phishing_service
 from app.features.phishing.models import UserBlocklist, UserWhitelist, PhishingEvent
-from app.features.fraud.service import score_transaction_service
 
 
 class TestRuleEngine(unittest.TestCase):

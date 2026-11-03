@@ -542,3 +542,55 @@ body {
 .flag-status.error {
     color: var(--tier-crit-text);
 }
+
+/* Tabs & Fraud Shield */
+.tabs-container {
+    display: flex;
+    gap: 6px;
+    background: rgba(0, 15, 40, 0.6);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    margin-bottom: 4px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 9px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.tab-btn.active {
+    background: var(--accent-brand);
+    color: #ffffff;
+    box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.fraud-inputs {
+    padding: 16px;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.input-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}

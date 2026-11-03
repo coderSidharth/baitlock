@@ -1,15 +1,12 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.core.limiter import limiter
 from app.api.v1.api import api_router
 from app.core.database import engine, Base
-
-# Import all models so Base.metadata is aware of them for table creation
-from app.features.phishing import models as phishing_models
-from app.features.fraud import models as fraud_models
-from app.features.auth import models as auth_models
-from app.features.chat import models as chat_models
-from app.features.companies import models as companies_models
+import app.models  # noqa: F401 -- registers every ORM model on Base.metadata
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -18,6 +15,8 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="Baitlock AI Backend - Enterprise DDD", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,5 +1,5 @@
 "use client";
-import { User, Mail, Shield, Bell, Key, ShieldCheck, HardDrive, Smartphone, Save, Trash2, Lock, Eye, EyeOff, X } from "lucide-react";
+import { User, Mail, Shield, Key, ShieldCheck, Smartphone, Save, Trash2, Lock, Eye, EyeOff, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { API_BASE_URL, API_V1_URL } from "@/lib/api";
 
