@@ -1,10 +1,10 @@
 from typing import Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.features.auth.models import User
 from app.api.deps import get_db, get_optional_user, get_current_user
 from app.features.phishing.schemas import PhishingCheckRequest, PhishingScoreResponse, WhitelistRequest
-from app.features.phishing.service import score_phishing_service, normalize_domain
+from app.features.phishing.service import score_phishing_service, normalize_domain, set_whitelisted, set_blocklisted
 from app.features.phishing.models import UserWhitelist, UserBlocklist
 
 router = APIRouter()
@@ -33,18 +33,13 @@ def add_to_whitelist(
     user: User = Depends(get_current_user)
 ):
     user_id = user.id
-    domain = normalize_domain(req.domain)
-    # Check if already whitelisted
-    existing = db.query(UserWhitelist).filter(
-        UserWhitelist.user_id == user_id,
-        UserWhitelist.domain == domain
-    ).first()
-    
-    if not existing:
-        whitelist_entry = UserWhitelist(user_id=user_id, domain=domain)
-        db.add(whitelist_entry)
-        db.commit()
-    
+    # Adding to the whitelist also removes the domain from the blocklist
+    # (whitelist and blocklist are mutually exclusive).
+    try:
+        domain = set_whitelisted(db, user_id, req.domain)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
     return {"status": "success", "message": f"{domain} has been added to your personal whitelist."}
 
 @router.delete("/whitelist")
@@ -82,16 +77,13 @@ def add_to_blocklist(
     user: User = Depends(get_current_user)
 ):
     user_id = user.id
-    domain = normalize_domain(req.domain)
-    existing = db.query(UserBlocklist).filter(
-        UserBlocklist.user_id == user_id,
-        UserBlocklist.domain == domain
-    ).first()
-    
-    if not existing:
-        db.add(UserBlocklist(user_id=user_id, domain=domain))
-        db.commit()
-    
+    # Adding to the blocklist also removes the domain from the whitelist
+    # (whitelist and blocklist are mutually exclusive).
+    try:
+        domain = set_blocklisted(db, user_id, req.domain)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
     return {"status": "success", "message": f"{domain} has been added to blocklist."}
 
 @router.delete("/blocklist")

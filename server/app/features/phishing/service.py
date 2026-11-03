@@ -4,9 +4,11 @@ from app.integrations.llm import analyze_text_with_llm
 from app.features.phishing.repository import phishing_repo
 from sqlalchemy.orm import Session
 from app.features.phishing.models import UserWhitelist, UserBlocklist, PhishingEvent
+from app.features.phishing.reputation import domain_reputation
 import json
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
+import ipaddress
 import requests
 import re
 
@@ -15,11 +17,90 @@ def normalize_domain(value: str) -> str:
     parsed = urlparse(candidate if "://" in candidate else f"//{candidate}")
     return (parsed.hostname or candidate.split("/", 1)[0].split(":", 1)[0]).lower().rstrip(".")
 
+
+_LABEL = re.compile(r"^(?!-)[a-z0-9_-]{1,63}(?<!-)$")
+
+
+def is_valid_domain(domain: str) -> bool:
+    """True for a real hostname (at least one dot, valid labels and TLD) or an IP address."""
+    if not domain or len(domain) > 253:
+        return False
+    try:
+        ipaddress.ip_address(domain)
+        return True
+    except ValueError:
+        pass
+    labels = domain.split(".")
+    if len(labels) < 2 or not all(_LABEL.match(label) for label in labels):
+        return False
+    tld = labels[-1]
+    return tld.startswith("xn--") or (tld.isalpha() and len(tld) >= 2)
+
+
+def require_domain(value: str) -> str:
+    """Normalize `value` to a domain or raise ValueError (e.g. for "Txn: $15000.0")."""
+    domain = normalize_domain(value)
+    if not is_valid_domain(domain):
+        raise ValueError(f"'{value}' is not a valid domain name")
+    return domain
+
+
+def set_whitelisted(db: Session, user_id: int, domain: str) -> str:
+    """Add a domain to the user's whitelist, removing it from the blocklist.
+
+    Whitelist and blocklist are mutually exclusive: a domain can only ever be on
+    one of them for a given user, so trusting a site also un-blocks it.
+    Raises ValueError if `domain` is not a valid domain name.
+    """
+    domain = require_domain(domain)
+    # Remove any conflicting blocklist entry first (mutual exclusivity)
+    db.query(UserBlocklist).filter(
+        UserBlocklist.user_id == user_id,
+        UserBlocklist.domain == domain
+    ).delete(synchronize_session=False)
+    existing = db.query(UserWhitelist).filter(
+        UserWhitelist.user_id == user_id,
+        UserWhitelist.domain == domain
+    ).first()
+    if not existing:
+        db.add(UserWhitelist(user_id=user_id, domain=domain))
+    db.commit()
+    return domain
+
+
+def set_blocklisted(db: Session, user_id: int, domain: str) -> str:
+    """Add a domain to the user's blocklist, removing it from the whitelist.
+
+    Mutual exclusivity mirror of set_whitelisted: blocking a site also un-trusts it.
+    Raises ValueError if `domain` is not a valid domain name.
+    """
+    domain = require_domain(domain)
+    # Remove any conflicting whitelist entry first (mutual exclusivity)
+    db.query(UserWhitelist).filter(
+        UserWhitelist.user_id == user_id,
+        UserWhitelist.domain == domain
+    ).delete(synchronize_session=False)
+    existing = db.query(UserBlocklist).filter(
+        UserBlocklist.user_id == user_id,
+        UserBlocklist.domain == domain
+    ).first()
+    if not existing:
+        db.add(UserBlocklist(user_id=user_id, domain=domain))
+    db.commit()
+    return domain
+
+# Verdicts produced by the user's own block/whitelist rather than by detection.
+_OVERRIDE_VERDICT_MARKERS = ("User Blocklist", "Reviewed by You")
+
+
+def _is_override_verdict(verdict: str | None) -> bool:
+    return any(m in (verdict or "") for m in _OVERRIDE_VERDICT_MARKERS)
+
+
 def strip_tags(html: str) -> str:
     text = re.sub(r'<[^>]+>', ' ', html)
     return ' '.join(text.split())
 
-import ipaddress
 import socket
 
 def _is_safe_url(url: str) -> bool:
@@ -101,13 +182,27 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
             
     # Check Cache only for fast background scans
     if fast_mode:
-        # Match by domain (not full URL) since query strings are stripped on storage
-        cache_query = db.query(PhishingEvent).filter(
-            PhishingEvent.input_url.contains(domain),
-            PhishingEvent.user_id == user_id,
-            PhishingEvent.created_at >= datetime.now(timezone.utc) - timedelta(hours=12)
+        # Narrow candidates with a substring filter, then confirm the EXACT host in
+        # Python: LIKE '%domain%' alone would let "pay.com" reuse a verdict cached for
+        # "paypay.com.evil.xyz". Verdicts that came from the user's own block/whitelist
+        # are never replayed: once the override is removed, it must stop applying
+        # (otherwise an un-blocked site stays blocked for the cache lifetime).
+        candidates = (
+            db.query(PhishingEvent)
+            .filter(
+                PhishingEvent.input_url.contains(domain),
+                PhishingEvent.user_id == user_id,
+                PhishingEvent.created_at >= datetime.now(timezone.utc) - timedelta(hours=12),
+            )
+            .order_by(PhishingEvent.created_at.desc())
+            .limit(25)
+            .all()
         )
-        cached_event = cache_query.order_by(PhishingEvent.created_at.desc()).first()
+        cached_event = next(
+            (e for e in candidates
+             if normalize_domain(e.input_url) == domain and not _is_override_verdict(e.verdict)),
+            None,
+        )
     
         if cached_event:
             reasons = []
@@ -194,37 +289,23 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
             final_score = min(100, final_score + 15)
             all_reasons.append("Flagged by community as legitimate domain")
 
-    TRUSTED_DOMAINS = {"google.com", "github.com", "microsoft.com", "apple.com", "amazon.com", "netflix.com", "facebook.com", "youtube.com"}
-    # User-content subdomains that are commonly abused for phishing — exempt from trusted cap
-    USER_CONTENT_HOSTS = {
-        "sites.google.com", "docs.google.com", "forms.gle", "storage.googleapis.com",
-        "firebasestorage.googleapis.com", "pages.dev", "workers.dev",
-        "blob.core.windows.net", "azurewebsites.net",
-        "s3.amazonaws.com", "github.io",
-        "web.app", "firebaseapp.com",
-    }
-    domain_base = domain
-    
-    # Check if domain is a user-content host (never cap these)
-    is_user_content = any(
-        domain_base == uc or domain_base.endswith(f".{uc}")
-        for uc in USER_CONTENT_HOSTS
-    )
-
-    is_trusted = False
-    if not is_user_content:
-        for td in TRUSTED_DOMAINS:
-            if domain_base == td or domain_base.endswith(f".{td}"):
-                is_trusted = True
-                break
-            
-    if is_trusted and final_score < 50:
-        # Only cap trusted domains if the LLM didn't explicitly flag the content as highly malicious
-        llm_score = llm_res.get("llm_score")
-        if llm_score is None or llm_score >= 30:
-            final_score = 50
-            all_reasons.append("Final score was capped to Moderate Risk because the root domain is highly trusted.")
-        
+    # Domain reputation: lexical signals alone cannot separate a real bank sign-in page
+    # from a convincing fake, so established sites (top popularity list, excluding
+    # multi-tenant / user-content platforms) are not blocked on URL shape alone.
+    # Hard red flags and a confident LLM content verdict still take precedence.
+    rep = domain_reputation(domain)
+    llm_score = llm_res.get("llm_score")
+    hard_red_flag = "@" in (urlparse(url).netloc or "") or "xn--" in domain
+    if rep["trusted"] and not hard_red_flag and (llm_score is None or llm_score >= 30):
+        if final_score < 80:
+            final_score = 80
+            # Keep deterministic findings (e.g. no HTTPS) but drop lexical-model hints
+            # that do not apply to an established site.
+            all_reasons = [r for r in all_reasons if r in rule_res["rule_reasons"]]
+            all_reasons.append("Established domain with strong global reputation.")
+    elif (rep["user_content"] or rep["multi_tenant"]) and final_score < 75:
+        all_reasons.append("Hosted on a platform where anyone can publish content; the reputable "
+                           "parent domain does not vouch for this page.")
 
     if final_score < 25: 
         verdict = "CRITICAL_RISK"

@@ -1,23 +1,76 @@
-import os
+import logging
 import secrets
+
+from pydantic import PrivateAttr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-class Settings(BaseSettings):
-    PROJECT_NAME: str = "Baitlock AI Backend"
-    # Using SQLite for development. Production would be postgresql://...
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./events.db")
-    
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")
-    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
-    OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
-    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+logger = logging.getLogger("baitlock.config")
 
-    # JWT Config — generate a random key at startup if SECRET_KEY is not set in .env
-    SECRET_KEY: str = os.getenv("SECRET_KEY", secrets.token_urlsafe(64))
+_PLACEHOLDER_SECRETS = {"", "CHANGE_ME_TO_A_RANDOM_SECRET"}
+
+
+class Settings(BaseSettings):
+    """Application settings, read from environment variables and server/.env."""
+
+    PROJECT_NAME: str = "Baitlock AI Backend"
+    # "production" turns on strict startup checks (see model_post_init).
+    ENVIRONMENT: str = "development"
+
+    # SQLite for development; use postgresql://... in production.
+    DATABASE_URL: str = "sqlite:///./events.db"
+
+    LLM_PROVIDER: str = "ollama"
+    OLLAMA_MODEL: str = "llama3.1:8b"
+    OLLAMA_URL: str = "http://localhost:11434/api/generate"
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "openai/gpt-oss-20b"
+
+    # JWT signing key. MUST be a stable, strong secret in production: a random
+    # per-process key invalidates tokens on restart and across workers.
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 1 week
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 1 week
+
+    # Comma-separated list of web origins allowed to call the API (the dashboard).
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+
+    # Brute-force protection for /auth/login (failed attempts per window).
+    LOGIN_RATE_LIMIT: int = 10
+    LOGIN_RATE_WINDOW_SECONDS: int = 900
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    _ephemeral_secret: bool = PrivateAttr(default=False)
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.strip().lower() in {"production", "prod"}
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip().rstrip("/") for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def ephemeral_secret(self) -> bool:
+        return self._ephemeral_secret
+
+    def model_post_init(self, __context) -> None:
+        if self.SECRET_KEY in _PLACEHOLDER_SECRETS:
+            if self.is_production:
+                raise RuntimeError(
+                    "SECRET_KEY is not set. In production it must be a strong, stable secret "
+                    "(generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\")."
+                )
+            # Development convenience: an ephemeral key (tokens reset on restart).
+            self.SECRET_KEY = secrets.token_urlsafe(64)
+            self._ephemeral_secret = True
+        elif len(self.SECRET_KEY) < 32:
+            if self.is_production:
+                raise RuntimeError("SECRET_KEY must be at least 32 characters in production.")
+            logger.warning("SECRET_KEY is shorter than 32 characters; use a stronger key.")
+
+        if self.is_production and "*" in self.cors_origins:
+            raise RuntimeError("ALLOWED_ORIGINS must not contain '*' in production (credentials are enabled).")
+
 
 settings = Settings()

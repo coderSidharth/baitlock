@@ -58,3 +58,5 @@ Thumbs.db
 
 # Agent metadata
 .agents/
+# Ship the trained phishing model artifact (retrain with server/train.py)
+!server/app/features/phishing/phishing_url_model.pkl

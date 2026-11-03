@@ -2,6 +2,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Shield } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
 import { API_V1_URL } from '@/lib/api';
 
 export default function LoginPage() {
@@ -108,87 +110,85 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="flex flex-col w-full min-h-screen max-w-[1920px] mx-auto relative z-10 px-8 py-10 fade-in">
-            <header className="flex justify-center items-center w-full mb-16 bg-linear-to-r from-transparent via-[#003882]/0 to-[#0048A6]/20 py-4 absolute top-0 left-0 right-0 z-50">
-                <Link href="/">
-                    <h1 className="font-cormorant text-[36px] font-bold text-white tracking-widest relative">Baitlock</h1>
+        <div className="flex flex-col w-full min-h-screen bg-background text-foreground fade-in">
+            <header className="flex justify-between items-center w-full px-6 sm:px-8 py-5">
+                <Link href="/" className="flex items-center gap-2.5">
+                    <span className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                        <Shield size={16} className="text-primary-foreground" strokeWidth={2.2} />
+                    </span>
+                    <span className="text-lg font-semibold tracking-tight">Baitlock</span>
                 </Link>
+                <ThemeToggle />
             </header>
 
-            <main className="flex-1 flex items-center justify-center -mt-20">
-                <div className="flex flex-col items-center">
-                    <h2 className="font-cormorant text-[48px] leading-16 font-bold text-white mb-8 tracking-tight text-center">
-                        {isRegister ? 'Create your account' : 'Analyze more clearly'}
-                    </h2>
+            <main className="flex-1 flex items-center justify-center px-4 pb-16">
+                <div className="flex flex-col items-center w-full max-w-sm">
+                    <h1 className="text-[28px] font-semibold tracking-tight mb-1.5 text-center">
+                        {isRegister ? 'Create your account' : 'Welcome back'}
+                    </h1>
+                    <p className="text-sm text-muted-foreground mb-8 text-center">
+                        {isRegister ? 'Set up your Baitlock security console.' : 'Sign in to your Baitlock security console.'}
+                    </p>
 
-                    <div className="w-112.5 bg-linear-to-b from-[#0B1530] to-[#040C1F] rounded-2xl p-10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 backdrop-blur-xl relative z-20">
-                        <form className="flex flex-col gap-6 w-full font-inter" onSubmit={handleSubmit}>
+                    <div className="w-full surface-panel p-7">
+                        <form className="flex flex-col gap-5 w-full" onSubmit={handleSubmit}>
 
                             {/* Error / Success messages */}
                             {error && (
-                                <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium">
+                                <div className="px-3.5 py-2.5 rounded-lg bg-destructive/10 border border-destructive/25 text-destructive text-sm font-medium">
                                     {error}
                                 </div>
                             )}
                             {success && (
-                                <div className="px-4 py-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-sm font-medium">
+                                <div className="px-3.5 py-2.5 rounded-lg bg-success/10 border border-success/25 text-success text-sm font-medium">
                                     {success}
                                 </div>
                             )}
 
                             {/* Full Name (register only) */}
                             {isRegister && (
-                                <div className="flex flex-col gap-2.5 w-full">
-                                    <label className="text-white text-[13px] font-medium tracking-wide">Full Name</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-0 bg-linear-to-b from-white/10 to-transparent rounded-lg opacity-10 pointer-events-none shadow-inner" />
-                                        <input
-                                            type="text"
-                                            value={fullName}
-                                            onChange={(e) => setFullName(e.target.value)}
-                                            placeholder="John Doe"
-                                            className="w-full h-13 bg-[#222222]/80 backdrop-blur-sm rounded-md px-4 text-white border border-black focus:outline-none focus:border-[#0048A6] transition-colors shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] relative z-10 placeholder:text-white/20"
-                                        />
-                                    </div>
+                                <div className="flex flex-col gap-2 w-full">
+                                    <label className="text-[13px] font-medium text-foreground">Full Name</label>
+                                    <input
+                                        type="text"
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        placeholder="John Doe"
+                                        className="w-full h-11 input-base px-3.5 text-sm"
+                                    />
                                 </div>
                             )}
 
-                            <div className="flex flex-col gap-2.5 w-full">
-                                <label className="text-white text-[13px] font-medium tracking-wide">Email Address</label>
-                                <div className="relative">
-                                    <div className="absolute inset-0 bg-linear-to-b from-white/10 to-transparent rounded-lg opacity-10 pointer-events-none shadow-inner" />
-                                    <input
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        placeholder="you@example.com"
-                                        required
-                                        className="w-full h-13 bg-[#222222]/80 backdrop-blur-sm rounded-md px-4 text-white border border-black focus:outline-none focus:border-[#0048A6] transition-colors shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] relative z-10 placeholder:text-white/20"
-                                    />
-                                </div>
+                            <div className="flex flex-col gap-2 w-full">
+                                <label className="text-[13px] font-medium text-foreground">Email Address</label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="you@example.com"
+                                    required
+                                    className="w-full h-11 input-base px-3.5 text-sm"
+                                />
                             </div>
 
-                            <div className="flex flex-col gap-2.5 w-full mb-4">
-                                <label className="text-white text-[13px] font-medium tracking-wide">Password</label>
-                                <div className="relative">
-                                    <div className="absolute inset-0 bg-linear-to-b from-white/10 to-transparent rounded-lg opacity-10 pointer-events-none shadow-inner" />
-                                    <input
-                                        type="password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="••••••••"
-                                        required
-                                        minLength={8}
-                                        className="w-full h-13 bg-[#222222]/80 backdrop-blur-sm rounded-md px-4 text-white border border-black focus:outline-none focus:border-[#0048A6] transition-colors shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] relative z-10 placeholder:text-white/20"
-                                    />
-                                </div>
+                            <div className="flex flex-col gap-2 w-full">
+                                <label className="text-[13px] font-medium text-foreground">Password</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    required
+                                    minLength={8}
+                                    className="w-full h-11 input-base px-3.5 text-sm"
+                                />
                             </div>
 
-                            <div className="flex flex-col items-center gap-5 w-full mt-2">
+                            <div className="flex flex-col items-center gap-4 w-full mt-1">
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="w-full py-3 bg-linear-to-r from-[#003882] to-[#0048A6] hover:brightness-110 transition-all rounded-md font-inter text-[15px] font-medium text-white shadow-[0_0_15px_rgba(0,30,100,0.6)] border border-white/10 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full h-11 btn-primary rounded-lg text-sm font-medium flex items-center justify-center disabled:cursor-not-allowed"
                                 >
                                     {loading ? (
                                         <span className="flex items-center gap-2">
@@ -210,7 +210,7 @@ export default function LoginPage() {
                                         setError('');
                                         setSuccess('');
                                     }}
-                                    className="font-inter text-white/60 hover:text-white transition-colors text-[14px] font-medium"
+                                    className="text-[13px] text-muted-foreground hover:text-foreground transition-colors font-medium"
                                 >
                                     {isRegister ? 'Already have an account? Sign in' : 'Don\'t have an account? Create one'}
                                 </button>

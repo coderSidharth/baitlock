@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_user
 from app.features.auth.models import User
 from app.features.companies import models, schemas
-from app.features.phishing.service import normalize_domain
+from app.features.phishing.service import normalize_domain, is_valid_domain
 
 router = APIRouter()
 
@@ -16,6 +16,8 @@ def flag_company(
 ):
     # Use the same normalizer as the phishing service
     domain = normalize_domain(payload.url)
+    if not is_valid_domain(domain):
+        raise HTTPException(status_code=422, detail=f"'{payload.url}' is not a valid domain name")
 
     if payload.flag_type not in ["malicious", "legitimate"]:
         raise HTTPException(status_code=400, detail="Invalid flag type. Must be 'malicious' or 'legitimate'")

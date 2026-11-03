@@ -9,7 +9,7 @@ export default function LiveFeedPage() {
 
     useEffect(() => {
         const pulseInterval = setInterval(() => setPulse((p) => !p), 1000);
-        
+
         const fetchEvents = () => {
             const token = localStorage.getItem('access_token');
             const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -23,7 +23,7 @@ export default function LiveFeedPage() {
                             let tier = "safe";
                             if (e.tier === "high" || e.tier === "critical") tier = "critical";
                             else if (e.tier === "moderate") tier = "warning";
-                            
+
                             return {
                                 id: e.id,
                                 time: time,
@@ -51,25 +51,25 @@ export default function LiveFeedPage() {
 
     const getTierConfig = (tier: string) => {
         switch(tier) {
-            case "critical": return { 
-                icon: <ShieldAlert className="w-5 h-5 text-red-400" />, 
-                bg: "bg-[#1E0505]/90", 
-                border: "border-red-500/20",
-                text: "text-red-400",
+            case "critical": return {
+                icon: <ShieldAlert className="w-5 h-5 text-destructive" />,
+                border: "border-destructive/25",
+                tint: "bg-destructive/5",
+                text: "text-destructive",
                 label: "CRITICAL THREAT"
             };
-            case "warning": return { 
-                icon: <AlertTriangle className="w-5 h-5 text-amber-400" />, 
-                bg: "bg-[#1F1305]/90", 
-                border: "border-amber-500/20",
-                text: "text-amber-400",
+            case "warning": return {
+                icon: <AlertTriangle className="w-5 h-5 text-warning" />,
+                border: "border-warning/25",
+                tint: "bg-warning/5",
+                text: "text-warning",
                 label: "MODERATE RISK"
             };
-            default: return { 
-                icon: <CheckCircle className="w-5 h-5 text-green-400" />, 
-                bg: "bg-[#051F10]/90", 
-                border: "border-green-500/20",
-                text: "text-green-400",
+            default: return {
+                icon: <CheckCircle className="w-5 h-5 text-success" />,
+                border: "border-success/25",
+                tint: "bg-success/5",
+                text: "text-success",
                 label: "CLEAN"
             };
         }
@@ -77,46 +77,49 @@ export default function LiveFeedPage() {
 
     return (
         <>
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 md:mb-10 pl-2 lg:pl-6 xl:pl-10">
-                <h2 className="font-cormorant text-[48px] md:text-[64px] leading-14.5 md:leading-19.5 font-bold tracking-tight mb-4 md:mb-0">Live Feed</h2>
-                <div className="flex items-center gap-2 mb-4 bg-white/5 px-4 py-2 rounded-full border border-white/10 shadow-lg">
-                    <Circle className={`w-3 h-3 fill-green-400 text-green-400 ${pulse ? 'opacity-100' : 'opacity-40'} transition-opacity`} />
-                    <span className="font-inter text-green-400 text-sm tracking-wide">Stream active</span>
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                <div>
+                    <h1 className="text-2xl md:text-3xl font-semibold tracking-tight mb-1">Live Feed</h1>
+                    <p className="text-muted-foreground text-sm">Streaming analysis events as they are processed.</p>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-muted/50">
+                    <Circle className={`w-2.5 h-2.5 fill-success text-success ${pulse ? 'opacity-100' : 'opacity-40'} transition-opacity`} />
+                    <span className="text-success text-sm font-medium">Stream active</span>
                 </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto pl-2 lg:pl-6 xl:pl-10 pr-4 custom-scrollbar pb-8">
-                <div className="flex flex-col gap-4 max-w-full">
+            <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar pb-8">
+                <div className="flex flex-col gap-3 max-w-full">
                     {events.length > 0 ? (
                         events.map((event) => {
                             const config = getTierConfig(event.tier);
                             return (
-                                <div key={event.id} className={`w-full p-5 rounded-[9px] border ${config.border} ${config.bg} backdrop-blur-sm shadow-xl transition-all hover:scale-[1.002] flex flex-col md:flex-row gap-4 justify-between`}>
-                                    <div className="flex flex-col gap-3 flex-1 min-w-0">
+                                <div key={event.id} className={`w-full p-4 rounded-xl border ${config.border} ${config.tint} hover-lift flex flex-col md:flex-row gap-4 justify-between`}>
+                                    <div className="flex flex-col gap-2.5 flex-1 min-w-0">
                                         <div className="flex items-center gap-3">
                                             {config.icon}
-                                            <h3 className="font-inter font-medium text-lg text-white truncate flex-1">{event.target}</h3>
+                                            <h3 className="font-medium text-base truncate flex-1">{event.target}</h3>
                                         </div>
                                         <div className="flex flex-col gap-1">
-                                            <p className="font-inter text-white/70 text-sm">
-                                                <span className="font-semibold text-white">Verdict:</span> {event.verdict}
+                                            <p className="text-sm text-muted-foreground">
+                                                <span className="font-medium text-foreground">Verdict:</span> {event.verdict}
                                             </p>
                                             {event.reasons.length > 0 && (
-                                                <p className="font-inter text-white/50 text-xs">
-                                                    <span className="font-semibold text-white/60">Flags:</span> {event.reasons.join(", ")}
+                                                <p className="text-xs text-muted-foreground">
+                                                    <span className="font-medium">Flags:</span> {event.reasons.join(", ")}
                                                 </p>
                                             )}
                                         </div>
                                     </div>
 
                                     <div className="flex md:flex-col items-center md:items-end justify-between md:justify-center gap-2 shrink-0">
-                                        <div className="flex items-center gap-2">
-                                            <Clock className="w-3.5 h-3.5 text-white/40" />
-                                            <span className="font-mono text-sm text-white/60">{event.time}</span>
+                                        <div className="flex items-center gap-1.5">
+                                            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                                            <span className="font-mono text-sm text-muted-foreground">{event.time}</span>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <span className="font-inter text-sm text-white/40">Score: <strong className={config.text}>{event.score}</strong></span>
-                                            <span className={`text-[10px] font-inter uppercase tracking-widest font-bold px-2.5 py-1 rounded-sm border ${config.border} ${config.text}`}>
+                                            <span className="text-sm text-muted-foreground">Score: <strong className={config.text}>{event.score}</strong></span>
+                                            <span className={`text-[10px] uppercase tracking-wider font-semibold px-2.5 py-1 rounded-md border ${config.border} ${config.text}`}>
                                                 {config.label}
                                             </span>
                                         </div>
@@ -125,8 +128,8 @@ export default function LiveFeedPage() {
                             );
                         })
                     ) : (
-                        <div className="p-10 rounded-[9px] border border-white/10 text-center flex flex-col items-center justify-center">
-                            <span className="text-white/40 italic">Waiting for events...</span>
+                        <div className="p-12 rounded-xl border border-dashed border-border text-center flex flex-col items-center justify-center">
+                            <span className="text-muted-foreground text-sm">Waiting for events...</span>
                         </div>
                     )}
                 </div>

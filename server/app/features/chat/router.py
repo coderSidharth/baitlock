@@ -10,7 +10,7 @@ from app.integrations.llm import chat_with_llm
 router = APIRouter()
 
 from app.features.phishing.models import UserWhitelist, UserBlocklist, PhishingEvent
-from app.features.phishing.service import normalize_domain
+from app.features.phishing.service import normalize_domain, set_whitelisted, set_blocklisted
 from app.features.fraud.models import FraudEvent
 import json
 
@@ -82,23 +82,19 @@ FORMATTING GUIDELINES:
                     
                     try:
                         if func_name == "add_to_whitelist":
-                            domain = normalize_domain(args.get("domain", ""))
-                            if not db.query(UserWhitelist).filter_by(user_id=user_id, domain=domain).first():
-                                db.add(UserWhitelist(user_id=user_id, domain=domain))
-                                db.commit()
+                            # Mutually exclusive: also un-blocks the domain.
+                            domain = set_whitelisted(db, user_id, args.get("domain", ""))
                             tool_result = f"Added {domain} to whitelist."
-                        
+
                         elif func_name == "remove_from_whitelist":
                             domain = normalize_domain(args.get("domain", ""))
                             db.query(UserWhitelist).filter_by(user_id=user_id, domain=domain).delete()
                             db.commit()
                             tool_result = f"Removed {domain} from whitelist."
-                            
+
                         elif func_name == "add_to_blocklist":
-                            domain = normalize_domain(args.get("domain", ""))
-                            if not db.query(UserBlocklist).filter_by(user_id=user_id, domain=domain).first():
-                                db.add(UserBlocklist(user_id=user_id, domain=domain))
-                                db.commit()
+                            # Mutually exclusive: also un-trusts the domain.
+                            domain = set_blocklisted(db, user_id, args.get("domain", ""))
                             tool_result = f"Added {domain} to explicit blocklist."
                             
                         elif func_name == "remove_from_blocklist":

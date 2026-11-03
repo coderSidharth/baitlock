@@ -10,6 +10,12 @@ if str(server_dir) not in sys.path:
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.database import Base
+# Register every model on Base so create_all() can resolve foreign keys
+# (e.g. phishing_events.user_id -> users.id) when this file runs on its own.
+import app.features.auth.models  # noqa: F401,E402
+import app.features.chat.models  # noqa: F401,E402
+import app.features.companies.models  # noqa: F401,E402
+import app.features.fraud.models  # noqa: F401,E402
 from app.common.rule_engine import rule_check_phishing, rule_check_transaction
 from app.features.phishing.features import extract_url_features, shannon_entropy
 from app.features.phishing.service import _is_safe_url, score_phishing_service

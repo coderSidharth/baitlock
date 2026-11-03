@@ -13,7 +13,7 @@ export default function MarkdownMessage({ content, isUser = false }: MarkdownMes
     }
 
     const elements = parseMarkdown(content);
-    return <div className="space-y-2.5 text-sm leading-relaxed text-zinc-100">{elements}</div>;
+    return <div className="space-y-2.5 text-sm leading-relaxed text-foreground">{elements}</div>;
 }
 
 function parseMarkdown(text: string): React.ReactNode[] {
@@ -33,7 +33,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
                 i++;
             }
             nodes.push(
-                <pre key={`code-${i}`} className="p-3 my-2 rounded-lg bg-black/60 border border-white/10 font-mono text-xs text-blue-200 overflow-x-auto">
+                <pre key={`code-${i}`} className="p-3 my-2 rounded-lg bg-muted border border-border font-mono text-xs text-foreground overflow-x-auto">
                     <code>{codeLines.join("\n")}</code>
                 </pre>
             );
@@ -54,33 +54,33 @@ function parseMarkdown(text: string): React.ReactNode[] {
                     .slice(1, -1)
                     .split("|")
                     .map((c) => c.trim());
-                
+
                 // Check if second row is separator like |---|---|
                 const hasSeparator = tableLines[1].replace(/[\s\-|:]/g, "").length === 0;
                 const dataRowLines = hasSeparator ? tableLines.slice(2) : tableLines.slice(1);
 
                 nodes.push(
-                    <div key={`table-${i}`} className="my-3 overflow-x-auto rounded-lg border border-white/15 bg-black/30 shadow-md">
+                    <div key={`table-${i}`} className="my-3 overflow-x-auto rounded-lg border border-border">
                         <table className="w-full text-left text-xs border-collapse">
                             <thead>
-                                <tr className="bg-blue-950/60 border-b border-white/15 text-white/90">
+                                <tr className="bg-muted border-b border-border text-foreground">
                                     {headerCells.map((h, idx) => (
-                                        <th key={idx} className="py-2 px-3 font-semibold tracking-wider uppercase text-[11px] text-blue-300">
+                                        <th key={idx} className="py-2 px-3 font-semibold tracking-wider uppercase text-[11px] text-muted-foreground">
                                             {renderInline(h)}
                                         </th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/5 font-inter">
+                            <tbody className="divide-y divide-border">
                                 {dataRowLines.map((rowStr, rIdx) => {
                                     const cells = rowStr
                                         .slice(1, -1)
                                         .split("|")
                                         .map((c) => c.trim());
                                     return (
-                                        <tr key={rIdx} className="hover:bg-white/5 transition-colors even:bg-white/[0.02]">
+                                        <tr key={rIdx} className="hover:bg-muted/50 transition-colors">
                                             {cells.map((c, cIdx) => (
-                                                <td key={cIdx} className="py-2 px-3 text-zinc-200">
+                                                <td key={cIdx} className="py-2 px-3 text-foreground">
                                                     {renderInline(c)}
                                                 </td>
                                             ))}
@@ -98,7 +98,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
         // 3. Headings
         if (line.startsWith("### ")) {
             nodes.push(
-                <h4 key={`h3-${i}`} className="text-base font-bold text-blue-300 pt-2 pb-0.5 tracking-tight flex items-center gap-1.5">
+                <h4 key={`h3-${i}`} className="text-base font-semibold text-foreground pt-2 pb-0.5 tracking-tight flex items-center gap-1.5">
                     {renderInline(line.slice(4))}
                 </h4>
             );
@@ -107,7 +107,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
         }
         if (line.startsWith("## ")) {
             nodes.push(
-                <h3 key={`h2-${i}`} className="text-lg font-bold text-white pt-2.5 pb-1 border-b border-white/10 tracking-tight">
+                <h3 key={`h2-${i}`} className="text-lg font-semibold text-foreground pt-2.5 pb-1 border-b border-border tracking-tight">
                     {renderInline(line.slice(3))}
                 </h3>
             );
@@ -116,7 +116,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
         }
         if (line.startsWith("# ")) {
             nodes.push(
-                <h2 key={`h1-${i}`} className="text-xl font-bold text-white pt-3 pb-1 tracking-tight">
+                <h2 key={`h1-${i}`} className="text-xl font-semibold text-foreground pt-3 pb-1 tracking-tight">
                     {renderInline(line.slice(2))}
                 </h2>
             );
@@ -138,8 +138,8 @@ function parseMarkdown(text: string): React.ReactNode[] {
             nodes.push(
                 <ul key={`list-${i}`} className="space-y-1.5 my-2 pl-4 list-none">
                     {listItems.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-zinc-200">
-                            <span className="text-blue-400 mt-1 shrink-0 text-xs">{item.isOrdered ? `${idx + 1}.` : "•"}</span>
+                        <li key={idx} className="flex items-start gap-2 text-foreground">
+                            <span className="text-primary mt-1 shrink-0 text-xs">{item.isOrdered ? `${idx + 1}.` : "•"}</span>
                             <span className="flex-1">{renderInline(item.text)}</span>
                         </li>
                     ))}
@@ -156,7 +156,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
 
         // 6. Regular Paragraph
         nodes.push(
-            <p key={`p-${i}`} className="text-zinc-200 leading-relaxed">
+            <p key={`p-${i}`} className="text-foreground leading-relaxed">
                 {renderInline(line)}
             </p>
         );
@@ -179,7 +179,7 @@ function renderInline(text: string): React.ReactNode {
         // Code
         if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
             return (
-                <code key={index} className="px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-300 font-mono text-xs border border-blue-500/30">
+                <code key={index} className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-xs border border-border">
                     {part.slice(1, -1)}
                 </code>
             );
@@ -188,7 +188,7 @@ function renderInline(text: string): React.ReactNode {
         // Bold
         if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
             return (
-                <strong key={index} className="font-semibold text-white">
+                <strong key={index} className="font-semibold text-foreground">
                     {part.slice(2, -2)}
                 </strong>
             );
@@ -197,7 +197,7 @@ function renderInline(text: string): React.ReactNode {
         // Italic
         if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
             return (
-                <em key={index} className="italic text-zinc-300">
+                <em key={index} className="italic text-muted-foreground">
                     {part.slice(1, -1)}
                 </em>
             );
@@ -207,7 +207,7 @@ function renderInline(text: string): React.ReactNode {
         const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
         if (linkMatch) {
             return (
-                <a key={index} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300 transition-colors">
+                <a key={index} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:no-underline transition-colors">
                     {linkMatch[1]}
                 </a>
             );
