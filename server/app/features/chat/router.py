@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List
 from app.api.deps import get_db, get_current_user
 from app.features.auth.models import User
 from app.features.chat.models import ChatMessage

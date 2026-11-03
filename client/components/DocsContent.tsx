@@ -7,7 +7,6 @@ import {
   Cpu,
   Sparkles,
   CheckCircle2,
-  Terminal,
   Search,
   BookOpen,
   ArrowLeft,

@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ShieldAlert, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 function HomeContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);

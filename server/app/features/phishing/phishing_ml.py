@@ -1,4 +1,3 @@
-import os
 import pickle
 import numpy as np
 from pathlib import Path
@@ -141,7 +140,7 @@ def train_and_evaluate_model():
     rec = recall_score(y_test, y_pred, zero_division=0)
     f1 = f1_score(y_test, y_pred, zero_division=0)
 
-    print(f"[ML Model] Layer 2 Classifier Trained — Held-out Evaluation:")
+    print("[ML Model] Layer 2 Classifier Trained — Held-out Evaluation:")
     print(f"           Precision: {prec:.4f} | Recall: {rec:.4f} | F1: {f1:.4f}")
 
     try:

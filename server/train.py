@@ -37,7 +37,6 @@ server_dir = Path(__file__).resolve().parent
 if str(server_dir) not in sys.path:
     sys.path.insert(0, str(server_dir))
 
-from app.features.phishing.features import extract_url_features
 from app.features.phishing.phishing_ml import (
     TRANCO_TOP_LEGITIMATE_URLS,
     PHISHTANK_OPENPHISH_URLS,
@@ -269,7 +268,7 @@ def train_pipeline(urls, labels, n_estimators=100, max_depth=24, output_path=MOD
         pickle.dump(clf, f)
 
     total_elapsed = time.time() - start_time
-    print(f"\n[✓] Trained model successfully saved to:")
+    print("\n[✓] Trained model successfully saved to:")
     print(f"    {output_path.resolve()}")
     print(f"[✓] Total pipeline time: {total_elapsed:.2f}s")
     return clf

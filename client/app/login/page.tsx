@@ -101,7 +101,7 @@ export default function LoginPage() {
                 window.postMessage({ type: 'BAITLOCK_LOGIN', token: data.access_token }, '*');
                 router.push('/dashboard');
             }
-        } catch (err) {
+        } catch {
             setError('Could not connect to server. Make sure the backend is running.');
             setLoading(false);
         }

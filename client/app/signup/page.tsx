@@ -49,7 +49,7 @@ export default function SignupPage() {
             } else {
                 router.push('/login');
             }
-        } catch (err) {
+        } catch {
             setError("Network error. Is the server running?");
             setLoading(false);
         }
