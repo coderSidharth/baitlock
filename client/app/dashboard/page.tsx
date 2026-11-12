@@ -9,7 +9,7 @@ export default function DashboardPage() {
   const [clearingLogs, setClearingLogs] = useState(false);
   const [filterType, setFilterType] = useState('All');
   const [dbStatus, setDbStatus] = useState<'ok' | 'warning' | 'error'>('warning');
-  const [llmStatus, setLlmStatus] = useState<'ok' | 'warning' | 'error'>('warning');
+  const [modelStatus, setModelStatus] = useState<'ok' | 'warning' | 'error'>('warning');
 
   // Fraud Simulation State
   const [showFraudModal, setShowFraudModal] = useState(false);
@@ -143,15 +143,15 @@ export default function DashboardPage() {
       .then(data => {
         if (data) {
           setDbStatus(data.database === 'connected' ? 'ok' : 'error');
-          setLlmStatus(data.status === 'healthy' ? 'ok' : 'warning');
+          setModelStatus(data.ml_model?.loaded && data.ml_model?.source === 'artifact' ? 'ok' : 'warning');
         } else {
           setDbStatus('error');
-          setLlmStatus('error');
+          setModelStatus('error');
         }
       })
       .catch(() => {
         setDbStatus('error');
-        setLlmStatus('error');
+        setModelStatus('error');
       });
 
     let active = true;
@@ -175,8 +175,8 @@ export default function DashboardPage() {
             Simulate Fraud Txn
           </button>
           {!showLogs ? (
-            <button onClick={() => setShowLogs(true)} className="flex items-center gap-2 px-3.5 py-2 rounded-lg btn-secondary text-sm font-medium cursor-pointer">
-              Restore logs
+            <button onClick={() => { setShowLogs(true); void refreshEvents(); }} className="flex items-center gap-2 px-3.5 py-2 rounded-lg btn-secondary text-sm font-medium cursor-pointer">
+              Refresh feed
             </button>
           ) : (
             <button onClick={handleClearLogs} disabled={clearingLogs} className="flex items-center gap-2 px-3.5 py-2 rounded-lg btn-secondary text-sm font-medium text-destructive hover:text-destructive cursor-pointer disabled:opacity-50">
@@ -210,8 +210,8 @@ export default function DashboardPage() {
           <div className="surface-panel p-6 flex flex-col">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">Module Status</h3>
             <div className="flex flex-col gap-2 w-full">
-              <StatusItem label="Ingestion" status={events.length > 0 ? "ok" : "warning"} />
-              <StatusItem label="LLM Analysis" status={llmStatus} />
+              <StatusItem label="Recent Activity" status={events.length > 0 ? "ok" : "idle"} />
+              <StatusItem label="Detection Model" status={modelStatus} />
               <StatusItem label="Db Sync" status={dbStatus} />
             </div>
           </div>
@@ -270,7 +270,7 @@ export default function DashboardPage() {
               )
             ) : (
               <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm h-32">
-                Logs cleared. Click &quot;Restore logs&quot; to view again.
+                Logs deleted. Click &quot;Refresh feed&quot; to check for new events.
               </div>
             )}
           </div>
@@ -284,7 +284,7 @@ export default function DashboardPage() {
               <div className="space-y-5 text-[15px] leading-relaxed text-foreground">
                 {criticalEvents.length > 0 ? (
                   <>
-                    <p>The neural model has intercepted <strong>{criticalEvents.length} severe threat(s)</strong> recently, including {topThreat.type === 'phishing' ? 'highly suspicious activity originating from' : 'a high-risk transaction'} <span className="text-destructive font-mono text-[13px] break-all bg-destructive/10 border border-destructive/20 px-1.5 py-0.5 rounded inline-block mt-1">{topThreat.target}</span>.</p>
+                    <p>Screening has identified <strong>{criticalEvents.length} severe threat(s)</strong> recently, including {topThreat.type === 'phishing' ? 'highly suspicious activity originating from' : 'a high-risk transaction'} <span className="text-destructive font-mono text-[13px] break-all bg-destructive/10 border border-destructive/20 px-1.5 py-0.5 rounded inline-block mt-1">{topThreat.target}</span>.</p>
                     <div className="p-5 rounded-lg border border-border bg-muted/40">
                       <h4 className="font-medium mb-2 flex items-center gap-2 text-[15px]">
                         <ShieldAlert className="w-5 h-5 text-warning shrink-0" />
@@ -339,7 +339,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold">Transaction Fraud Simulator</h3>
-                  <p className="text-muted-foreground text-xs">Simulate transaction parameters to test Layer 1 rules &amp; Layer 2 ML anomaly detection.</p>
+                  <p className="text-muted-foreground text-xs">Simulate transaction parameters to test the configured fraud screening engine.</p>
                 </div>
               </div>
               <button
@@ -361,7 +361,7 @@ export default function DashboardPage() {
                     onClick={() => applyPreset("15000", "18", "3", "3500")}
                     className="p-2.5 rounded-lg border border-destructive/30 bg-destructive/5 hover:bg-destructive/10 text-left text-xs transition-colors cursor-pointer"
                   >
-                    <div className="font-semibold text-destructive">Critical: Exceeds Limit</div>
+                    <div className="font-semibold text-destructive">Over-limit amount</div>
                     <div className="text-muted-foreground font-mono text-[10px] mt-0.5">$15k • 18 txns • 3 AM</div>
                   </button>
                   <button
@@ -369,16 +369,16 @@ export default function DashboardPage() {
                     onClick={() => applyPreset("350", "2", "23", "5500")}
                     className="p-2.5 rounded-lg border border-warning/30 bg-warning/5 hover:bg-warning/10 text-left text-xs transition-colors cursor-pointer"
                   >
-                    <div className="font-semibold text-warning">High: Geo-Velocity</div>
-                    <div className="text-muted-foreground font-mono text-[10px] mt-0.5">$350 • 2 txns • 5,500 mi</div>
+                    <div className="font-semibold text-warning">Distant transaction</div>
+                    <div className="text-muted-foreground font-mono text-[10px] mt-0.5">$350 • 2 txns • 5,500 km</div>
                   </button>
                   <button
                     type="button"
                     onClick={() => applyPreset("42.50", "1", "14", "8")}
                     className="p-2.5 rounded-lg border border-success/30 bg-success/5 hover:bg-success/10 text-left text-xs transition-colors cursor-pointer"
                   >
-                    <div className="font-semibold text-success">Safe: Normal Purchase</div>
-                    <div className="text-muted-foreground font-mono text-[10px] mt-0.5">$42.50 • 1 txn • 8 mi</div>
+                    <div className="font-semibold text-success">Normal purchase</div>
+                    <div className="text-muted-foreground font-mono text-[10px] mt-0.5">$42.50 • 1 txn • 8 km</div>
                   </button>
                 </div>
               </div>
@@ -426,7 +426,7 @@ export default function DashboardPage() {
                     <span className="text-[10px] text-muted-foreground block mt-1">Off-hours (2:00–4:00 AM) increase anomaly score</span>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-foreground mb-1.5">Geo Distance (miles from home)</label>
+                    <label className="block text-xs font-medium text-foreground mb-1.5">Geo Distance (km from home)</label>
                     <input
                       type="number"
                       step="0.1"
@@ -436,7 +436,7 @@ export default function DashboardPage() {
                       className="w-full px-3 py-2 input-base font-mono text-sm"
                       placeholder="e.g. 25.0"
                     />
-                    <span className="text-[10px] text-muted-foreground block mt-1">&gt; 5,000 miles triggers impossible travel</span>
+                    <span className="text-[10px] text-muted-foreground block mt-1">&gt; 5,000 km triggers impossible travel</span>
                   </div>
                 </div>
 
@@ -529,13 +529,15 @@ export default function DashboardPage() {
   );
 }
 
-function StatusItem({ label, status }: { label: string, status: "ok" | "warning" | "error" }) {
+function StatusItem({ label, status }: { label: string, status: "ok" | "warning" | "error" | "idle" }) {
   const dot = {
+    idle: "bg-muted-foreground",
     ok: "bg-success",
     warning: "bg-warning",
     error: "bg-destructive",
   };
   const text = {
+    idle: "No events",
     ok: "Operational",
     warning: "Degraded",
     error: "Offline",

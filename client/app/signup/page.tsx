@@ -1,8 +1,8 @@
 "use client";
+import BrandMark from "@/components/BrandMark";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Shield } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 import { API_V1_URL } from '@/lib/api';
 
@@ -61,9 +61,7 @@ export default function SignupPage() {
         <div className="flex flex-col w-full min-h-screen bg-background text-foreground fade-in">
             <header className="flex justify-between items-center w-full px-6 sm:px-8 py-5">
                 <Link href="/" className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                        <Shield size={16} className="text-primary-foreground" strokeWidth={2.2} />
-                    </span>
+                    <BrandMark />
                     <span className="text-lg font-semibold tracking-tight">Baitlock</span>
                 </Link>
                 <ThemeToggle />

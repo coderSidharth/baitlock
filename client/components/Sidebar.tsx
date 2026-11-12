@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import Image from "next/image";
+import BrandMark from "@/components/BrandMark";
 import { LayoutDashboard, ShieldHalf, Activity, BookOpen, LogOut, PanelLeftClose, PanelLeftOpen, User } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { API_V1_URL } from "@/lib/api";
@@ -52,7 +52,7 @@ export default function Sidebar() {
                 <div className={`flex ${isCollapsed ? 'flex-col gap-4 items-center justify-start' : 'flex-row items-center justify-between'} mb-2 lg:mb-8`}>
                     {!isCollapsed && (
                         <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-                            <Image src="/baitlock-logo.png" alt="Baitlock" width={28} height={28} className="w-7 h-7 object-contain" />
+                            <BrandMark />
                             <span className="text-lg font-semibold tracking-tight text-foreground">Baitlock</span>
                         </Link>
                     )}
@@ -70,8 +70,8 @@ export default function Sidebar() {
                     </div>
 
                     {isCollapsed && (
-                        <Link href="/" className="block hover:opacity-80 transition-opacity">
-                            <Image src="/baitlock-logo.png" alt="Baitlock" width={28} height={28} className="w-7 h-7 object-contain" />
+                        <Link href="/" aria-label="Baitlock home" className="block hover:opacity-80 transition-opacity">
+                            <BrandMark />
                         </Link>
                     )}
                 </div>

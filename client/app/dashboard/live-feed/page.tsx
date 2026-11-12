@@ -6,6 +6,7 @@ import { API_V1_URL, type SecurityEvent } from "@/lib/api";
 export default function LiveFeedPage() {
     const [events, setEvents] = useState<(Omit<SecurityEvent, "tier" | "created_at" | "type"> & { tier: string; time: string })[]>([]);
     const [pulse, setPulse] = useState(true);
+    const [streamStatus, setStreamStatus] = useState<"connecting" | "active" | "offline">("connecting");
 
     useEffect(() => {
         const pulseInterval = setInterval(() => setPulse((p) => !p), 1000);
@@ -14,20 +15,21 @@ export default function LiveFeedPage() {
             const token = localStorage.getItem('access_token');
             const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
             fetch(`${API_V1_URL}/events?limit=50`, { headers })
-                .then(res => res.ok ? res.json() : null)
+                .then(res => {
+                    if (!res.ok) throw new Error(`Event stream returned ${res.status}`);
+                    return res.json();
+                })
                 .then(data => {
                     if (data?.events) {
+                        setStreamStatus("active");
                         const formattedEvents = data.events.map((e: SecurityEvent) => {
                             const date = new Date(e.created_at);
                             const time = date.toLocaleTimeString('en-US', { hour12: false });
-                            let tier = "safe";
-                            if (e.tier === "high" || e.tier === "critical") tier = "critical";
-                            else if (e.tier === "moderate") tier = "warning";
 
                             return {
                                 id: e.id,
                                 time: time,
-                                tier: tier,
+                                tier: e.tier,
                                 target: e.target,
                                 verdict: e.verdict,
                                 reasons: e.reasons || [],
@@ -37,7 +39,10 @@ export default function LiveFeedPage() {
                         setEvents(formattedEvents);
                     }
                 })
-                .catch(err => console.warn("Live feed fetch warning:", err?.message || err));
+                .catch(err => {
+                    setStreamStatus("offline");
+                    console.warn("Live feed fetch warning:", err?.message || err);
+                });
         };
 
         fetchEvents();
@@ -51,14 +56,15 @@ export default function LiveFeedPage() {
 
     const getTierConfig = (tier: string) => {
         switch(tier) {
-            case "critical": return {
+            case "critical":
+            case "high": return {
                 icon: <ShieldAlert className="w-5 h-5 text-destructive" />,
                 border: "border-destructive/25",
                 tint: "bg-destructive/5",
                 text: "text-destructive",
-                label: "CRITICAL THREAT"
+                label: tier === "critical" ? "CRITICAL THREAT" : "HIGH RISK"
             };
-            case "warning": return {
+            case "moderate": return {
                 icon: <AlertTriangle className="w-5 h-5 text-warning" />,
                 border: "border-warning/25",
                 tint: "bg-warning/5",
@@ -83,8 +89,8 @@ export default function LiveFeedPage() {
                     <p className="text-muted-foreground text-sm">Streaming analysis events as they are processed.</p>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-muted/50">
-                    <Circle className={`w-2.5 h-2.5 fill-success text-success ${pulse ? 'opacity-100' : 'opacity-40'} transition-opacity`} />
-                    <span className="text-success text-sm font-medium">Stream active</span>
+                    <Circle className={`w-2.5 h-2.5 ${streamStatus === "active" ? "fill-success text-success" : "fill-warning text-warning"} ${pulse ? 'opacity-100' : 'opacity-40'} transition-opacity`} />
+                    <span className="text-sm font-medium" role="status">{streamStatus === "active" ? "Stream active" : streamStatus === "offline" ? "Stream offline — retrying" : "Connecting…"}</span>
                 </div>
             </header>
 

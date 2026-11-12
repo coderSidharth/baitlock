@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
+import BrandMark from "@/components/BrandMark";
 import {
   Shield,
   Layers,
@@ -82,7 +83,7 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
               <span>Back to Home</span>
             </Link>
             <span className="text-border">|</span>
-            <span className="text-lg font-semibold tracking-tight">Baitlock Docs</span>
+            <span className="flex items-center gap-2.5 text-lg font-semibold tracking-tight"><BrandMark />Baitlock Docs</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -226,7 +227,7 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
                   </div>
                   <h3 className="text-lg font-semibold mb-2">Rule Engine</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Every request first passes through deterministic checks. For URLs, the system analyzes the top-level domain against a blocklist, calculates Shannon entropy to detect randomly generated domains, and uses Levenshtein distance to identify brand impersonation such as distinguishing between a legitimate domain and a spoofed variant. For transactions, the engine verifies the transaction amount against the user&apos;s historical average and checks the frequency of recent activity.
+                    Every request first passes through deterministic checks. For URLs, the system analyzes the top-level domain against a blocklist, calculates Shannon entropy to detect randomly generated domains, and uses Levenshtein distance to identify brand impersonation such as distinguishing between a legitimate domain and a spoofed variant. For transactions, the engine verifies the transaction amount against a fixed amount limit and checks the frequency of recent activity.
                   </p>
                 </div>
                 <div className="mt-5 pt-4 border-t border-border font-mono text-xs text-muted-foreground">
@@ -245,11 +246,11 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
                   </div>
                   <h3 className="text-lg font-semibold mb-2">Machine Learning Classifier</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    If the rule engine does not immediately flag the input as highly critical, the data is passed to a machine learning model. The URL classifier is a gradient-boosted model trained on 200,000 URLs drawn from PhishTank, the Phishing.Database live feed and public benign corpora, and evaluated only on domains it never saw during training. A domain-reputation layer keeps established sites from being blocked on URL shape alone. The transaction model uses an Isolation Forest algorithm trained on synthetic behavioral data to detect anomalous spending patterns or geographic mismatches.
+                    If the rule engine does not immediately flag the input as highly critical, the data is passed to a machine learning model. The URL classifier is a gradient-boosted model trained on 200,000 URLs drawn from PhishTank, the Phishing.Database live feed and public benign corpora, and evaluated only on domains it never saw during training. A domain-reputation layer keeps established sites from being blocked on URL shape alone. Transaction screening uses deterministic rules by default. The synthetic Isolation Forest model is an optional development demo and is disabled in production.
                   </p>
                 </div>
                 <div className="mt-5 pt-4 border-t border-border font-mono text-xs text-muted-foreground">
-                  Gradient Boosting &amp; Isolation Forest
+                  URL classifier &amp; transaction rules
                 </div>
               </div>
 
@@ -264,11 +265,11 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
                   </div>
                   <h3 className="text-lg font-semibold mb-2">LLM Cascade</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    If the composite score from the rule engine and the machine learning model falls within an ambiguous band, typically a score between thirty and seventy, the system escalates the analysis. If page text is available, a large language model analyzes the content for brand spoofing, urgency language, and credential harvesting intent. This deliberate escalation ensures that expensive and latency-heavy API calls are only made when deterministic systems are uncertain.
+                    If the composite score from the rule engine and the machine learning model falls within an ambiguous band, typically a score between forty and eighty-five, the system escalates the analysis. If page text is available, a large language model analyzes the content for brand spoofing, urgency language, and credential harvesting intent. This deliberate escalation ensures that expensive and latency-heavy API calls are only made when deterministic systems are uncertain.
                   </p>
                 </div>
                 <div className="mt-5 pt-4 border-t border-border font-mono text-xs text-muted-foreground">
-                  Escalation Score: 30 - 70
+                  Escalation Score: 40 - 85
                 </div>
               </div>
             </div>
@@ -368,7 +369,7 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
                   <p className="text-foreground text-sm font-medium">
                     Clone the repository from GitHub using the git clone command followed by the repository URL.
                   </p>
-                  <CodeLine cmd="cd baitlock" id="cd-baitlock" copiedStep={copiedStep} onCopy={copyToClipboard} />
+                  <CodeLine cmd="git clone YOUR_REPOSITORY_URL baitlock" id="cd-baitlock" copiedStep={copiedStep} onCopy={copyToClipboard} />
                 </div>
               </div>
 
@@ -388,7 +389,7 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
                 <StepNum n={4} />
                 <div className="flex-1 space-y-2">
                   <p className="text-foreground text-sm font-medium">
-                    Set up the backend environment by creating a Python virtual environment and installing the required dependencies from the requirements file.
+                    Set up the backend environment by creating a Python virtual environment and installing the locked dependencies with uv.
                   </p>
                   <CodeLine cmd="cd server && uv sync" id="backend-setup" copiedStep={copiedStep} onCopy={copyToClipboard} />
                 </div>
@@ -407,9 +408,9 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
                 <StepNum n={6} />
                 <div className="flex-1 space-y-2">
                   <p className="text-foreground text-sm font-medium">
-                    Initialize the database schema and start the FastAPI backend server. Ensure the server is running on local port eight thousand.
+                    Run uv run alembic upgrade head from server/ before starting the API. For an existing database, follow the backup and repair procedure in README.md. The API runs on port 8000.
                   </p>
-                  <CodeLine cmd="uv run fastapi dev main.py" id="start-backend" copiedStep={copiedStep} onCopy={copyToClipboard} />
+                  <CodeLine cmd="uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000" id="start-backend" copiedStep={copiedStep} onCopy={copyToClipboard} />
                 </div>
               </div>
 
@@ -418,9 +419,9 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
                 <StepNum n={7} />
                 <div className="flex-1 space-y-2">
                   <p className="text-foreground text-sm font-medium">
-                    Navigate to the frontend dashboard directory, install the Node.js dependencies, and start the development server.
+                    In a new terminal from the project root, install the dashboard dependencies and start the development server.
                   </p>
-                  <CodeLine cmd="cd client && npm install && npm run dev" id="start-frontend" copiedStep={copiedStep} onCopy={copyToClipboard} />
+                  <CodeLine cmd="cd client && npm ci && npm run dev" id="start-frontend" copiedStep={copiedStep} onCopy={copyToClipboard} />
                 </div>
               </div>
             </div>
@@ -461,7 +462,7 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
                     <p className="text-foreground text-sm font-medium">
                       Ensure the Baitlock backend server is running locally on port eight thousand.
                     </p>
-                    <CodeLine cmd="uv run fastapi dev main.py" id="ext-step-1" copiedStep={copiedStep} onCopy={copyToClipboard} />
+                    <CodeLine cmd="uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000" id="ext-step-1" copiedStep={copiedStep} onCopy={copyToClipboard} />
                   </div>
                 </div>
 
@@ -496,7 +497,7 @@ export default function DocsContent({ isDashboard = false }: { isDashboard?: boo
                 <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/50 border border-border">
                   <StepNum n={5} />
                   <p className="text-foreground text-sm font-medium pt-1">
-                    Extract the downloaded Baitlock Extension Package, then select its <code className="rounded bg-muted px-1.5 py-0.5 text-foreground font-mono text-[13px] border border-border">extension</code> directory.
+                    Extract the downloaded package, then select the extracted folder containing <code className="rounded bg-muted px-1.5 py-0.5 text-foreground font-mono text-[13px] border border-border">manifest.json</code>.
                   </p>
                 </div>
 

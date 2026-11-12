@@ -1,25 +1,31 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Ban, ShieldAlert, CheckCircle, Trash2 } from "lucide-react";
-import { API_V1_URL } from "@/lib/api";
+import { API_V1_URL, errorMessage } from "@/lib/api";
 
 type DomainEntry = { domain?: string };
 type FeedEvent = { id: string; type?: string; target: string; tier: string; score: number; verdict: string };
 type OverrideEntry = FeedEvent & { isExplicit?: boolean };
+
+async function requireSuccess(response: Response) {
+    if (!response.ok) throw new Error(`Request failed (${response.status}). Please sign in again or retry.`);
+    return response;
+}
 
 export default function OverridesPage() {
     const [activeTab, setActiveTab] = useState<'blocklist' | 'whitelist'>('blocklist');
     const [blockedEvents, setBlockedEvents] = useState<OverrideEntry[]>([]);
     const [whitelist, setWhitelist] = useState<OverrideEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
     useEffect(() => {
         const token = localStorage.getItem('access_token');
         const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
         Promise.all([
-            fetch(`${API_V1_URL}/events?limit=50`, { headers }).then(r => r.ok ? r.json() : { events: [] }).catch(() => ({ events: [] })),
-            fetch(`${API_V1_URL}/phishing/blocklist`, { headers }).then(r => r.ok ? r.json() : { blocklist: [] }).catch(() => ({ blocklist: [] })),
-            fetch(`${API_V1_URL}/phishing/whitelist`, { headers }).then(r => r.ok ? r.json() : { whitelist: [] }).catch(() => ({ whitelist: [] }))
+            fetch(`${API_V1_URL}/events?limit=50`, { headers }).then(requireSuccess).then(r => r.json()),
+            fetch(`${API_V1_URL}/phishing/blocklist`, { headers }).then(requireSuccess).then(r => r.json()),
+            fetch(`${API_V1_URL}/phishing/whitelist`, { headers }).then(requireSuccess).then(r => r.json())
         ])
         .then(([eventsData, blocklistData, whitelistData]) => {
             // Build the set of whitelisted (trusted) domains so they are never shown
@@ -55,18 +61,24 @@ export default function OverridesPage() {
                     id: `explicit_block_${b.domain}`,
                     target: b.domain,
                     tier: "critical",
-                    score: 100,
+                    score: 0,
                     verdict: "Blocked manually by user",
                     isExplicit: true
                 }));
 
-            setBlockedEvents([...explicitBlocks, ...blocked]);
+            const listedDomains = new Set(explicitBlocks.map((entry: OverrideEntry) => hostOf(entry.target)));
+            setBlockedEvents([...explicitBlocks, ...blocked.filter((entry: FeedEvent) => {
+                const host = hostOf(entry.target);
+                if (listedDomains.has(host)) return false;
+                listedDomains.add(host);
+                return true;
+            })]);
 
             const explicitWhitelists = (whitelistData.whitelist || []).map((w: DomainEntry) => ({
                 id: `explicit_white_${w.domain}`,
                 target: w.domain,
                 tier: "safe",
-                score: 0,
+                score: 100,
                 verdict: "Allowed by user",
                 isExplicit: true
             }));
@@ -75,7 +87,7 @@ export default function OverridesPage() {
             setLoading(false);
         })
         .catch(err => {
-            console.warn("Overrides load warning:", err?.message || err);
+            setError(errorMessage(err));
             setLoading(false);
         });
     }, []);
@@ -108,6 +120,8 @@ export default function OverridesPage() {
                 <div className="flex flex-col gap-3 max-w-4xl">
                     {loading ? (
                         <div className="text-muted-foreground text-sm">Loading overrides...</div>
+                    ) : error ? (
+                        <div role="alert" className="text-destructive text-sm">{error}</div>
                     ) : activeTab === 'blocklist' ? (
                         blockedEvents.length > 0 ? (
                             blockedEvents.map((event) => (
@@ -133,10 +147,10 @@ export default function OverridesPage() {
                                                           ...(localStorage.getItem('access_token') ? { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` } : {})
                                                         } as HeadersInit,
                                                         body: JSON.stringify({ domain: event.target })
-                                                      }).then(() => {
+                                                      }).then(requireSuccess).then(() => {
                                                           alert("Removed from explicit blocklist!");
                                                           window.location.reload();
-                                                      });
+                                                      }).catch(err => setError(errorMessage(err)));
                                                   }}
                                                 >
                                                     <Trash2 size={12} />
@@ -154,10 +168,10 @@ export default function OverridesPage() {
                                                         ...(localStorage.getItem('access_token') ? { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` } : {})
                                                       } as HeadersInit,
                                                       body: JSON.stringify({ domain: event.target })
-                                                    }).then(() => {
+                                                    }).then(requireSuccess).then(() => {
                                                         alert("Added to whitelist!");
                                                         window.location.reload();
-                                                    });
+                                                    }).catch(err => setError(errorMessage(err)));
                                                 }}
                                               >
                                                   <CheckCircle size={12} />
@@ -200,10 +214,10 @@ export default function OverridesPage() {
                                                       ...(localStorage.getItem('access_token') ? { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` } : {})
                                                     } as HeadersInit,
                                                     body: JSON.stringify({ domain: item.target })
-                                                  }).then(() => {
+                                                  }).then(requireSuccess).then(() => {
                                                       alert("Removed from whitelist!");
                                                       window.location.reload();
-                                                  });
+                                                  }).catch(err => setError(errorMessage(err)));
                                               }}
                                             >
                                                 <Trash2 size={12} />

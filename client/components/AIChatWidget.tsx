@@ -1,7 +1,8 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, Send, X, Shield, RotateCcw } from "lucide-react";
+import { MessageSquare, Send, X, RotateCcw } from "lucide-react";
 import MarkdownMessage from "./MarkdownMessage";
+import BrandMark from "./BrandMark";
 import { errorMessage, API_V1_URL } from "@/lib/api";
 
 type ChatMessage = { id: number; role: string; content: string };
@@ -124,9 +125,7 @@ export default function AIChatWidget() {
                     {/* Header */}
                     <div className="p-4 border-b border-border flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                            <span className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-                                <Shield size={15} className="text-primary-foreground" strokeWidth={2.2} />
-                            </span>
+                            <BrandMark />
                             <span className="font-semibold text-base tracking-tight">Baitlock AI</span>
                         </div>
                         <div className="flex items-center gap-1">

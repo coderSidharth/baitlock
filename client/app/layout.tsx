@@ -9,9 +9,6 @@ const firaCode = localFont({ src: "./fonts/FiraCode-Latin.woff2", variable: "--f
 export const metadata: Metadata = {
   title: "Baitlock | Phishing Shield",
   description: "Real-time phishing detector",
-  icons: {
-    icon: "/baitlock-logo.png",
-  },
 };
 
 // Applies the saved (or system) theme before paint to avoid a flash.
