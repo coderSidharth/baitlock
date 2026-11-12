@@ -19,7 +19,7 @@ from pathlib import Path
 
 import tldextract
 
-_tld = tldextract.TLDExtract(suffix_list_urls=())
+_tld = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
 
 POPULAR_DOMAINS_PATH = Path(__file__).parent / "data" / "popular_domains.txt"
 

@@ -2,12 +2,14 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageSquare, Send, X, Shield, RotateCcw } from "lucide-react";
 import MarkdownMessage from "./MarkdownMessage";
-import { API_V1_URL } from "@/lib/api";
+import { errorMessage, API_V1_URL } from "@/lib/api";
+
+type ChatMessage = { id: number; role: string; content: string };
 
 export default function AIChatWidget() {
     const [isOpen, setIsOpen] = useState(false);
     const [chatInput, setChatInput] = useState("");
-    const [chatMessages, setChatMessages] = useState<any[]>([
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
         { id: 1, role: 'assistant', content: "Hello! I am Baitlock AI. I'm actively monitoring your traffic. Any questions about recent threats?" }
     ]);
     const [loading, setLoading] = useState(false);
@@ -30,7 +32,6 @@ export default function AIChatWidget() {
 
     useEffect(() => {
         if (isOpen && !historyLoaded) {
-            setLoading(true);
             const token = localStorage.getItem('access_token');
             fetch(`${API_V1_URL}/chat/history`, {
                 headers: token ? { 'Authorization': `Bearer ${token}` } : {}
@@ -38,7 +39,7 @@ export default function AIChatWidget() {
                 .then(res => res.json())
                 .then(data => {
                     if (data.messages && data.messages.length > 0) {
-                        const formatted = data.messages.map((m: any) => ({
+                        const formatted = data.messages.map((m: ChatMessage) => ({
                             id: m.id,
                             role: m.role,
                             content: sanitizeContent(m.content)
@@ -65,10 +66,11 @@ export default function AIChatWidget() {
     const clearChatHistory = async () => {
         try {
             const token = localStorage.getItem('access_token');
-            await fetch(`${API_V1_URL}/chat/history`, {
+            const response = await fetch(`${API_V1_URL}/chat/history`, {
                 method: 'DELETE',
                 headers: token ? { 'Authorization': `Bearer ${token}` } : {}
             });
+            if (!response.ok) throw new Error(`Chat deletion failed (${response.status})`);
             setChatMessages([
                 { id: Date.now(), role: 'assistant', content: "Chat history cleared. How can I help protect you today?" }
             ]);
@@ -77,7 +79,9 @@ export default function AIChatWidget() {
         }
     };
 
-    const sendChatMessage = async (customText?: string) => {
+    const sendChatMessage = async (customText?: string, confirmedAction?: {
+        action: "add_to_blocklist" | "add_to_whitelist"; domain: string;
+    }) => {
         const text = (customText !== undefined ? customText : chatInput).trim();
         if (!text) return;
 
@@ -93,7 +97,8 @@ export default function AIChatWidget() {
                 headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
                 body: JSON.stringify({
                     role: "user",
-                    content: text
+                    content: text,
+                    confirmed_action: confirmedAction
                 })
             });
             const data = await res.json().catch(() => ({}));
@@ -103,8 +108,8 @@ export default function AIChatWidget() {
             } else {
                 setChatMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: "⏳ AI response took longer than expected. Please retry in a few moments." }]);
             }
-        } catch (error: any) {
-            console.warn("Chat connection issue:", error?.message || error);
+        } catch (error: unknown) {
+            console.warn("Chat connection issue:", errorMessage(error));
             setChatMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: "⚠️ Could not connect to Baitlock AI service. Please verify the backend is running." }]);
         } finally {
             setLoading(false);
@@ -169,17 +174,17 @@ export default function AIChatWidget() {
                     <div className="px-3 py-2 border-t border-border flex gap-1.5 overflow-x-auto no-scrollbar">
                         <button
                             type="button"
-                            onClick={() => sendChatMessage("Add phishing-test.com to my blocklist")}
+                            onClick={() => sendChatMessage("Add phishing-test.com to my blocklist", { action: "add_to_blocklist", domain: "phishing-test.com" })}
                             className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/20 transition-colors cursor-pointer"
                         >
-                            + Block Domain
+                            + Block phishing-test.com
                         </button>
                         <button
                             type="button"
-                            onClick={() => sendChatMessage("Add safe-portal.org to my whitelist")}
+                            onClick={() => sendChatMessage("Add safe-portal.org to my whitelist", { action: "add_to_whitelist", domain: "safe-portal.org" })}
                             className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-success/10 hover:bg-success/20 text-success border border-success/20 transition-colors cursor-pointer"
                         >
-                            + Whitelist Domain
+                            + Whitelist safe-portal.org
                         </button>
                         <button
                             type="button"

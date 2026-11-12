@@ -42,7 +42,7 @@ export default function Sidebar() {
         }
         localStorage.removeItem('isLoggedIn');
         localStorage.removeItem('access_token');
-        window.postMessage({ type: 'BAITLOCK_LOGOUT' }, '*');
+        window.postMessage({ type: 'BAITLOCK_LOGOUT' }, window.location.origin);
         router.push('/login');
     };
 

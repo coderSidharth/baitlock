@@ -1,10 +1,10 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, Index, func
 from app.core.database import Base
 
 class CompanyFlag(Base):
     __tablename__ = "company_flags"
     __table_args__ = (
-        UniqueConstraint("user_id", "domain", "flag_type", name="uq_user_domain_flag"),
+        Index("uq_user_domain_vote", "user_id", "domain", unique=True),
     )
 
     id = Column(Integer, primary_key=True, index=True)

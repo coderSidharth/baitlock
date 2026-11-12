@@ -7,7 +7,7 @@ Verdict = Literal["SAFE", "LEGITIMATE", "MODERATE_RISK", "REVIEW_NEEDED", "HIGH_
 class ScoreBreakdown(BaseModel):
     rule_score: int = Field(ge=0, le=100, description="Deterministic rule engine score (0-100)")
     ml_score: int = Field(ge=0, le=100, description="ML model score (0-100)")
-    llm_score: int = Field(default=0, ge=0, le=100, description="LLM analysis score (0-100), only for phishing with text")
+    llm_score: int | None = Field(default=None, ge=0, le=100, description="LLM analysis score (0-100), only for phishing with text")
 
     @field_validator("rule_score", "ml_score", "llm_score", mode="before")
     @classmethod
@@ -19,13 +19,13 @@ class ScoreBreakdown(BaseModel):
     model_config = {"frozen": True}
 
 class ScoreResult(BaseModel):
-    score: int = Field(ge=0, le=100, description="Final fused risk score (0-100)", alias="final_score")
+    final_score: int = Field(ge=0, le=100, description="Final fused safety score (0-100)")
     verdict: str = Field(description="Human-readable risk verdict")
     tier: RiskTier = Field(description="Risk tier: safe | moderate | high | critical")
     reasons: list[str] = Field(default_factory=list, description="Explanation strings for the score")
     breakdown: ScoreBreakdown = Field(description="Individual component score breakdown")
 
-    @field_validator("score", mode="before")
+    @field_validator("final_score", mode="before")
     @classmethod
     def clamp_score(cls, v: int) -> int:
         if isinstance(v, (int, float)):
@@ -47,9 +47,9 @@ class ScoreResult(BaseModel):
 
     @model_validator(mode="after")
     def tier_matches_score(self) -> "ScoreResult":
-        expected_tier = _score_to_tier(self.score)
+        expected_tier = _score_to_tier(self.final_score)
         if self.tier != expected_tier:
-            pass
+            raise ValueError("Risk tier does not match final_score")
         return self
 
     model_config = {"frozen": True, "populate_by_name": True, "serialize_by_alias": True}
@@ -67,3 +67,12 @@ def _score_to_tier(score: int) -> RiskTier:
     elif score < 50: return "high"
     elif score < 75: return "moderate"
     else: return "safe"
+
+
+def tier_for_verdict(verdict: str | None, score: float) -> RiskTier:
+    verdict = (verdict or "").upper()
+    if "BLOCKED" in verdict or "CRITICAL" in verdict or verdict == "FRAUD":
+        return "critical"
+    if "HIGH" in verdict or "REVIEW_NEEDED" in verdict:
+        return "high"
+    return _score_to_tier(score)

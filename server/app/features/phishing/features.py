@@ -23,7 +23,7 @@ import jellyfish
 import tldextract
 
 # Use the bundled Public Suffix List snapshot only (no network at request time).
-_tld_extract = tldextract.TLDExtract(suffix_list_urls=())
+_tld_extract = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
 
 # Frequently impersonated brands.
 TOP_BRANDS = [

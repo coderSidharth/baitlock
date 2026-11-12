@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Circle, ShieldAlert, CheckCircle, AlertTriangle, Clock } from "lucide-react";
-import { API_V1_URL } from "@/lib/api";
+import { API_V1_URL, type SecurityEvent } from "@/lib/api";
 
 export default function LiveFeedPage() {
-    const [events, setEvents] = useState<any[]>([]);
+    const [events, setEvents] = useState<(Omit<SecurityEvent, "tier" | "created_at" | "type"> & { tier: string; time: string })[]>([]);
     const [pulse, setPulse] = useState(true);
 
     useEffect(() => {
@@ -17,7 +17,7 @@ export default function LiveFeedPage() {
                 .then(res => res.ok ? res.json() : null)
                 .then(data => {
                     if (data?.events) {
-                        const formattedEvents = data.events.map((e: any) => {
+                        const formattedEvents = data.events.map((e: SecurityEvent) => {
                             const date = new Date(e.created_at);
                             const time = date.toLocaleTimeString('en-US', { hour12: false });
                             let tier = "safe";

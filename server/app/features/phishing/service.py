@@ -1,16 +1,22 @@
 from app.common.rule_engine import rule_check_phishing
 from app.features.phishing.phishing_ml import predict_phishing_ml
 from app.integrations.llm import analyze_text_with_llm
-from app.features.phishing.repository import phishing_repo
+from app.features.phishing.repository import phishing_repo, cache_key_for_url
 from sqlalchemy.orm import Session
 from app.features.phishing.models import UserWhitelist, UserBlocklist, PhishingEvent
 from app.features.phishing.reputation import domain_reputation
 import json
+import logging
 from datetime import datetime, timedelta, timezone
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin, urlunparse
 import ipaddress
 import requests
+import urllib3
+import time
 import re
+import socket
+
+logger = logging.getLogger(__name__)
 
 def normalize_domain(value: str) -> str:
     candidate = value.strip()
@@ -18,7 +24,7 @@ def normalize_domain(value: str) -> str:
     return (parsed.hostname or candidate.split("/", 1)[0].split(":", 1)[0]).lower().rstrip(".")
 
 
-_LABEL = re.compile(r"^(?!-)[a-z0-9_-]{1,63}(?<!-)$")
+_LABEL = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)$")
 
 
 def is_valid_domain(domain: str) -> bool:
@@ -53,6 +59,8 @@ def set_whitelisted(db: Session, user_id: int, domain: str) -> str:
     Raises ValueError if `domain` is not a valid domain name.
     """
     domain = require_domain(domain)
+    from app.features.auth.models import User
+    db.query(User).filter(User.id == user_id).with_for_update().first()
     # Remove any conflicting blocklist entry first (mutual exclusivity)
     db.query(UserBlocklist).filter(
         UserBlocklist.user_id == user_id,
@@ -75,6 +83,8 @@ def set_blocklisted(db: Session, user_id: int, domain: str) -> str:
     Raises ValueError if `domain` is not a valid domain name.
     """
     domain = require_domain(domain)
+    from app.features.auth.models import User
+    db.query(User).filter(User.id == user_id).with_for_update().first()
     # Remove any conflicting whitelist entry first (mutual exclusivity)
     db.query(UserWhitelist).filter(
         UserWhitelist.user_id == user_id,
@@ -101,38 +111,89 @@ def strip_tags(html: str) -> str:
     text = re.sub(r'<[^>]+>', ' ', html)
     return ' '.join(text.split())
 
-import socket
+_MAX_RESPONSE_BYTES = 1_000_000  # 1 MB — reject responses larger than this
 
-def _is_safe_url(url: str) -> bool:
-    """Reject URLs that would cause SSRF (internal IPs, non-http schemes, metadata endpoints)."""
+
+def _resolve_safe_ip(url: str) -> str | None:
     try:
         parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https"):
-            return False
-        hostname = parsed.hostname
-        if not hostname:
-            return False
-        # Resolve the hostname and check if it's a private/reserved IP
-        resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        for _, _, _, _, sockaddr in resolved:
-            ip = ipaddress.ip_address(sockaddr[0])
-            if ip.is_private or ip.is_reserved or ip.is_loopback or ip.is_link_local:
-                return False
-        return True
-    except Exception:
-        return False
+        if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password:
+            return None
+        if parsed.port not in (None, 80, 443):
+            return None
+        addresses = socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80), socket.AF_UNSPEC, socket.SOCK_STREAM)
+        ips = [ipaddress.ip_address(item[4][0]) for item in addresses]
+        if not ips or any(not ip.is_global or ip.is_multicast or ip.ipv4_mapped is not None
+                          for ip in ips if isinstance(ip, ipaddress.IPv6Address)):
+            return None
+        if any(not ip.is_global or ip.is_multicast for ip in ips):
+            return None
+        return str(ips[0])
+    except (OSError, ValueError, UnicodeError):
+        return None
+
+
+def _is_safe_url(url: str) -> bool:
+    return _resolve_safe_ip(url) is not None
+
 
 def fetch_page_content(url: str) -> str:
-    if not _is_safe_url(url):
-        return ""
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, headers=headers, timeout=5, allow_redirects=False)
-        res.raise_for_status()
-        return strip_tags(res.text)[:3000]
-    except Exception as e:
-        print(f"Failed to fetch {url}: {e}")
-        return ""
+    """Pin each hop's public IP while verifying TLS against the original hostname."""
+    deadline = time.monotonic() + 8
+    for _ in range(4):
+        pinned_ip = _resolve_safe_ip(url)
+        if pinned_ip is None or time.monotonic() >= deadline:
+            return ""
+        parsed = urlparse(url)
+        pool = None
+        response = None
+        try:
+            kwargs = {"port": parsed.port or (443 if parsed.scheme == "https" else 80)}
+            if parsed.scheme == "https":
+                pool = urllib3.HTTPSConnectionPool(
+                    pinned_ip, server_hostname=parsed.hostname, assert_hostname=parsed.hostname,
+                    cert_reqs="CERT_REQUIRED", ca_certs=requests.certs.where(), **kwargs,
+                )
+            else:
+                pool = urllib3.HTTPConnectionPool(pinned_ip, **kwargs)
+            host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+            if parsed.port:
+                host += f":{parsed.port}"
+            path = urlunparse(("", "", parsed.path or "/", parsed.params, parsed.query, ""))
+            response = pool.urlopen(
+                "GET", path, headers={"Host": host, "User-Agent": "Baitlock/1.0", "Accept-Encoding": "identity"},
+                timeout=urllib3.Timeout(connect=2, read=2, total=max(0.1, deadline - time.monotonic())),
+                redirect=False, retries=False, preload_content=False,
+            )
+            if response.status in (301, 302, 303, 307, 308):
+                location = response.headers.get("Location")
+                if not location:
+                    return ""
+                url = urljoin(url, location)  # every redirect is resolved, checked and pinned again
+                continue
+            if response.status >= 400 or response.headers.get("Content-Encoding", "identity") != "identity":
+                return ""
+            content_type = response.headers.get("Content-Type", "").lower()
+            if "text/" not in content_type:
+                return ""
+            body = bytearray()
+            while len(body) <= _MAX_RESPONSE_BYTES and time.monotonic() < deadline:
+                # read1 returns after one socket read. A peer trickling bytes must
+                # not keep a read(n) call alive past our overall deadline.
+                chunk = response.read1(min(8192, _MAX_RESPONSE_BYTES + 1 - len(body)), decode_content=False)
+                if not chunk:
+                    return strip_tags(body.decode("utf-8", errors="replace"))[:3000]
+                body.extend(chunk)
+            return ""
+        except (urllib3.exceptions.HTTPError, OSError, ValueError):
+            logger.warning("Page content fetch failed")
+            return ""
+        finally:
+            if response is not None:
+                response.close()
+            if pool is not None:
+                pool.close()
+    return ""
 
 
 def score_phishing_service(db: Session, url: str, text_content: str = None, user_id: int = None, fast_mode: bool = False) -> dict:
@@ -154,7 +215,7 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
                 "verdict": "BLOCKED (User Blocklist)",
                 "tier": "critical",
                 "reasons": ["This domain is on your personal blocklist."],
-                "breakdown": {"rule_score": 0, "ml_score": 0, "llm_score": 0}
+                "breakdown": {"rule_score": 0, "ml_score": 0, "llm_score": None}
             }
             phishing_repo.create(db, url, text_content, result, user_id=user_id)
             return result
@@ -175,56 +236,43 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
                 "verdict": "SAFE (Reviewed by You)",
                 "tier": "safe",
                 "reasons": ["You added this site to your personal safe list."],
-                "breakdown": {"rule_score": 0, "ml_score": 0, "llm_score": 0}
+                "breakdown": {"rule_score": 0, "ml_score": 0, "llm_score": None}
             }
             phishing_repo.create(db, url, text_content, result, user_id=user_id)
             return result
             
     # Check Cache only for fast background scans
     if fast_mode:
-        # Narrow candidates with a substring filter, then confirm the EXACT host in
-        # Python: LIKE '%domain%' alone would let "pay.com" reuse a verdict cached for
-        # "paypay.com.evil.xyz". Verdicts that came from the user's own block/whitelist
-        # are never replayed: once the override is removed, it must stop applying
-        # (otherwise an un-blocked site stays blocked for the cache lifetime).
-        candidates = (
+        cached_event = (
             db.query(PhishingEvent)
             .filter(
-                PhishingEvent.input_url.contains(domain),
+                PhishingEvent.cache_key == cache_key_for_url(url),
                 PhishingEvent.user_id == user_id,
                 PhishingEvent.created_at >= datetime.now(timezone.utc) - timedelta(hours=12),
             )
-            .order_by(PhishingEvent.created_at.desc())
-            .limit(25)
-            .all()
+            .order_by(PhishingEvent.created_at.desc(), PhishingEvent.id.desc())
+            .first()
         )
-        cached_event = next(
-            (e for e in candidates
-             if normalize_domain(e.input_url) == domain and not _is_override_verdict(e.verdict)),
-            None,
-        )
-    
+        if cached_event and _is_override_verdict(cached_event.verdict):
+            cached_event = None
+
         if cached_event:
             reasons = []
             if cached_event.reasons_jsonb:
                 try:
                     reasons = json.loads(cached_event.reasons_jsonb)
-                except Exception:
-                    pass
+                except (ValueError, TypeError):
+                    logger.warning("Invalid stored phishing reasons")
             
-            # Determine tier from verdict if possible, otherwise safe
-            tier = "safe"
-            v = cached_event.verdict.lower()
-            if "critical" in v or "blocked" in v: tier = "critical"
-            elif "high" in v or "review" in v: tier = "high"
-            elif "moderate" in v: tier = "moderate"
-            
+            from app.common.schemas import tier_for_verdict
+            tier = tier_for_verdict(cached_event.verdict, cached_event.final_score)
+
             result = {
                 "final_score": cached_event.final_score,
                 "verdict": cached_event.verdict.replace(" (Cached)", "") + " (Cached)",
                 "tier": tier,
                 "reasons": reasons,
-                "breakdown": {"rule_score": 0, "ml_score": 0, "llm_score": 0}
+                "breakdown": {"rule_score": 0, "ml_score": 0, "llm_score": None}
             }
             # Don't create a new event row for cache hits — it floods the feed
             return result
@@ -273,22 +321,7 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
     raw_reasons = rule_res["rule_reasons"] + ml_res["ml_reasons"] + llm_res.get("llm_reasons", [])
     all_reasons = [r for r in raw_reasons if "API error" not in r and "Not enough text" not in r]
     
-    # Check community flags from CompanyFlag (require ≥3 distinct users for penalties)
-    from app.features.companies.models import CompanyFlag
-    from sqlalchemy import func as sa_func
-    community_flags = db.query(CompanyFlag).filter(CompanyFlag.domain == domain).all()
-    if community_flags:
-        # Count distinct users per flag type
-        malicious_users = len(set(f.user_id for f in community_flags if f.flag_type == "malicious" and f.user_id))
-        legit_users = len(set(f.user_id for f in community_flags if f.flag_type == "legitimate" and f.user_id))
-        if malicious_users > legit_users and malicious_users >= 3:
-            penalty = min(35, malicious_users * 10)
-            final_score = max(0, final_score - penalty)
-            all_reasons.append(f"Flagged by community as suspicious ({malicious_users} distinct users)")
-        elif legit_users > malicious_users and legit_users >= 3 and final_score < 80:
-            final_score = min(100, final_score + 15)
-            all_reasons.append("Flagged by community as legitimate domain")
-
+    # Community votes remain advisory: unverified accounts cannot change a verdict.
     # Domain reputation: lexical signals alone cannot separate a real bank sign-in page
     # from a convincing fake, so established sites (top popularity list, excluding
     # multi-tenant / user-content platforms) are not blocked on URL shape alone.
@@ -328,9 +361,11 @@ def score_phishing_service(db: Session, url: str, text_content: str = None, user
         "breakdown": {
             "rule_score": rule_res["rule_score"],
             "ml_score": ml_res["ml_score"],
-            "llm_score": llm_res.get("llm_score") if llm_res.get("llm_score") is not None else 0
+            "llm_score": llm_res.get("llm_score")
         }
     }
     
-    phishing_repo.create(db, url, text_content, result, user_id=user_id)
+    # Only deterministic fast scans may populate the navigation cache. Otherwise
+    # client-supplied page text could poison shared anonymous URL verdicts.
+    phishing_repo.create(db, url, text_content, result, user_id=user_id, cacheable=fast_mode)
     return result

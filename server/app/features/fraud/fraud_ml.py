@@ -1,7 +1,10 @@
+import threading
+from app.core.config import settings
 import numpy as np
 from sklearn.ensemble import IsolationForest
 
 _fraud_model = None
+_model_lock = threading.Lock()
 
 def get_fraud_model():
     """
@@ -42,7 +45,10 @@ def predict_transaction_fraud(amount: float, velocity: int, hour: int, geo_dista
     """
     Scores a transaction using Isolation Forest with calibrated score mapping.
     """
-    model = get_fraud_model()
+    if not settings.ENABLE_DEMO_FRAUD_MODEL or settings.is_production:
+        return {"fraud_score": 100, "fraud_reasons": ["Rule-based screening only; no validated fraud model is configured."]}
+    with _model_lock:
+        model = get_fraud_model()
     
     features = [[amount, velocity, hour, geo_distance]]
     

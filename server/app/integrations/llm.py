@@ -1,60 +1,56 @@
-import os
 import requests
 import json
-import time
-import re
+import logging
+import threading
 from app.core.config import settings
 
+logger = logging.getLogger("baitlock.llm")
+
 def get_llm_config():
-    # Allow dynamic environment or settings override
-    provider = os.getenv("LLM_PROVIDER", settings.LLM_PROVIDER).lower()
+    """Return LLM provider settings from the central config (not raw os.getenv)."""
     return {
-        "provider": provider,
-        "ollama_model": os.getenv("OLLAMA_MODEL", settings.OLLAMA_MODEL),
-        "ollama_url": os.getenv("OLLAMA_URL", settings.OLLAMA_URL),
-        "groq_api_key": os.getenv("GROQ_API_KEY", settings.GROQ_API_KEY),
-        "groq_model": os.getenv("GROQ_MODEL", settings.GROQ_MODEL),
+        "provider": settings.LLM_PROVIDER.lower(),
+        "ollama_model": settings.OLLAMA_MODEL,
+        "ollama_url": settings.OLLAMA_URL,
+        "ollama_chat_url": settings.OLLAMA_CHAT_URL,
+        "groq_api_key": settings.GROQ_API_KEY,
+        "groq_model": settings.GROQ_MODEL,
     }
 
-def _call_groq_api(payload: dict, api_key: str, max_retries: int = 2) -> tuple[dict | None, str | None]:
-    """
-    Calls Groq chat completions with automatic exponential backoff retry on 429 rate limits.
-    Returns (response_json, error_code).
-    """
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    url = "https://api.groq.com/openai/v1/chat/completions"
+_llm_slots = threading.BoundedSemaphore(settings.LLM_MAX_CONCURRENT)
 
-    for attempt in range(max_retries + 1):
-        try:
-            res = requests.post(url, json=payload, headers=headers, timeout=120)
-            if res.status_code == 200:
-                return res.json(), None
-            elif res.status_code == 429:
-                if attempt < max_retries:
-                    retry_after = res.headers.get("Retry-After")
-                    wait_seconds = 2.0 * (attempt + 1)
-                    if retry_after:
-                        try:
-                            wait_seconds = min(max(float(retry_after), 1.0), 6.0)
-                        except (ValueError, TypeError):
-                            pass
-                    time.sleep(wait_seconds)
-                    continue
-                return None, "RATE_LIMIT"
-            else:
-                return None, f"HTTP_{res.status_code}"
-        except requests.exceptions.RequestException:
-            if attempt < max_retries:
-                time.sleep(1.5)
-                continue
-            return None, "CONNECTION_ERROR"
-        except Exception:
-            return None, "UNKNOWN_ERROR"
 
-    return None, "RATE_LIMIT"
+def _analysis_result(data: dict) -> dict:
+    """An incomplete model response must never become a confident safe score."""
+    score = data["threat_score"]
+    reason = data["explanation"]
+    if isinstance(score, bool) or not isinstance(score, (int, float)) or not 0 <= score <= 100:
+        raise ValueError("Invalid threat score")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError("Invalid explanation")
+    return {"llm_score": 100 - int(score), "llm_reason": reason.strip()[:1000]}
+
+
+def _post_json(url: str, **kwargs) -> dict:
+    if not _llm_slots.acquire(blocking=False):
+        raise requests.RequestException("AI capacity exhausted")
+    try:
+        with requests.post(url, timeout=(2, settings.LLM_TIMEOUT_SECONDS), **kwargs) as response:
+            response.raise_for_status()
+            return response.json()
+    finally:
+        _llm_slots.release()
+
+
+def _call_groq_api(payload: dict, api_key: str) -> tuple[dict | None, str | None]:
+    try:
+        return _post_json("https://api.groq.com/openai/v1/chat/completions", json=payload,
+                          headers={"Authorization": f"Bearer {api_key}"}), None
+    except requests.HTTPError as exc:
+        return None, "RATE_LIMIT" if exc.response is not None and exc.response.status_code == 429 else "HTTP_ERROR"
+    except (requests.RequestException, ValueError):
+        return None, "CONNECTION_ERROR"
+
 
 def _analyze_with_groq(prompt: str, groq_model: str, groq_api_key: str) -> dict | None:
     if not groq_api_key:
@@ -66,7 +62,7 @@ def _analyze_with_groq(prompt: str, groq_model: str, groq_api_key: str) -> dict 
     }
     res_data, error = _call_groq_api(payload, groq_api_key)
     if error == "RATE_LIMIT":
-        return {"llm_score": 50, "llm_reason": "AI deep inspection temporarily deferred due to high load."}
+        return {"llm_score": None, "llm_reason": "AI deep inspection temporarily deferred due to high load."}
     elif error or not res_data:
         return None
 
@@ -78,15 +74,10 @@ def _analyze_with_groq(prompt: str, groq_model: str, groq_api_key: str) -> dict 
             raw_text = raw_text.split("```")[1].split("```")[0].strip()
             
         data = json.loads(raw_text)
-        raw_threat = max(0, min(100, int(data.get("threat_score", 0))))
-        inverted_score = 100 - raw_threat
-        
-        return {
-            "llm_score": inverted_score,
-            "llm_reason": data.get("explanation", "Analyzed by AI.")
-        }
+        return _analysis_result(data)
     except Exception as e:
-        return {"llm_score": None, "llm_reason": f"Groq parsing error: {str(e)}"}
+        logger.error("Groq response parsing error: %s", e, exc_info=True)
+        return {"llm_score": None, "llm_reason": "AI analysis encountered a parsing error."}
 
 def _analyze_with_ollama(prompt: str, ollama_model: str, ollama_url: str) -> dict | None:
     try:
@@ -96,9 +87,7 @@ def _analyze_with_ollama(prompt: str, ollama_model: str, ollama_url: str) -> dic
             "stream": False,
             "format": "json"
         }
-        res = requests.post(ollama_url, json=payload, timeout=12)
-        res.raise_for_status()
-        response_json = res.json()
+        response_json = _post_json(ollama_url, json=payload)
         raw_text = response_json.get("response", "{}").strip()
         if raw_text.startswith("```json"):
             raw_text = raw_text.split("```json")[1].split("```")[0].strip()
@@ -106,13 +95,7 @@ def _analyze_with_ollama(prompt: str, ollama_model: str, ollama_url: str) -> dic
             raw_text = raw_text.split("```")[1].split("```")[0].strip()
         
         data = json.loads(raw_text)
-        raw_threat = max(0, min(100, int(data.get("threat_score", 0))))
-        inverted_score = 100 - raw_threat
-        
-        return {
-            "llm_score": inverted_score,
-            "llm_reason": data.get("explanation", "Analyzed by Ollama.")
-        }
+        return _analysis_result(data)
     except Exception:
         return None
 
@@ -159,7 +142,7 @@ def analyze_text_with_llm(text_content: str) -> dict:
         ollama_res = _analyze_with_ollama(prompt, ollama_model, ollama_url)
         if ollama_res is not None:
             return ollama_res
-        return {"llm_score": 50, "llm_reason": "AI deep inspection temporarily unavailable."}
+        return {"llm_score": None, "llm_reason": "AI deep inspection temporarily unavailable."}
     else:
         # Default/Ollama mode
         ollama_res = _analyze_with_ollama(prompt, ollama_model, ollama_url)
@@ -172,8 +155,8 @@ def analyze_text_with_llm(text_content: str) -> dict:
                 return groq_res
         return {"llm_score": None, "llm_reason": "AI service currently unreachable."}
 
-def _chat_with_groq(messages: list, groq_model: str, groq_api_key: str) -> dict:
-    tools = [
+
+CHAT_TOOLS = [
         {
             "type": "function",
             "function": {
@@ -242,12 +225,16 @@ def _chat_with_groq(messages: list, groq_model: str, groq_api_key: str) -> dict:
             }
         }
     ]
+
+
+def _chat_with_groq(messages: list, groq_model: str, groq_api_key: str) -> dict:
+
     
     payload = {
         "model": groq_model,
         "messages": messages,
         "temperature": 0.3,
-        "tools": tools,
+        "tools": CHAT_TOOLS,
         "tool_choice": "auto"
     }
 
@@ -266,41 +253,67 @@ def _chat_with_groq(messages: list, groq_model: str, groq_api_key: str) -> dict:
     try:
         msg = res_data["choices"][0]["message"]
         
-        # Polyfill for tool calls encoded in content strings
-        if msg.get("content") and "<function=" in msg["content"]:
-            matches = re.finditer(r'<function=(.*?)>(.*?)</function>', msg["content"], re.DOTALL)
-            if not msg.get("tool_calls"):
-                msg["tool_calls"] = []
-            for idx, match in enumerate(matches):
-                func_name = match.group(1)
-                args = match.group(2)
-                msg["tool_calls"].append({
-                    "id": f"call_{idx}",
-                    "type": "function",
-                    "function": {
-                        "name": func_name,
-                        "arguments": args
-                    }
-                })
-            # Strip it from content so raw internal syntax isn't leaked
-            msg["content"] = re.sub(r'<function=.*?>.*?</function>', '', msg["content"], flags=re.DOTALL).strip()
-            
         return msg
     except Exception:
         return {"role": "assistant", "content": "⚠️ **An unexpected response occurred.** Please try again."}
 
-def _chat_with_ollama(messages: list, ollama_model: str, ollama_url: str) -> dict | None:
+def _ollama_messages(messages: list) -> list[dict]:
+    converted = []
+    for message in messages:
+        role = message.get("role", "user")
+        item = {"role": role, "content": message.get("content") or ""}
+        if role == "tool":
+            item["tool_name"] = message.get("name") or message.get("tool_name", "")
+        elif role == "assistant" and message.get("tool_calls"):
+            item["tool_calls"] = []
+            for call in message["tool_calls"]:
+                function = call.get("function", {})
+                arguments = function.get("arguments", {})
+                if isinstance(arguments, str):
+                    try:
+                        arguments = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        arguments = {}
+                item["tool_calls"].append({
+                    "function": {
+                        "name": function.get("name", ""),
+                        "arguments": arguments if isinstance(arguments, dict) else {},
+                    }
+                })
+        converted.append(item)
+    return converted
+
+
+def _chat_with_ollama(messages: list, ollama_model: str, ollama_chat_url: str) -> dict | None:
     try:
-        last_msg = messages[-1]["content"] if messages else ""
         payload = {
             "model": ollama_model,
-            "prompt": f"User: {last_msg}\nBaitlock:",
-            "stream": False
+            "messages": _ollama_messages(messages),
+            "tools": CHAT_TOOLS,
+            "stream": False,
         }
-        res = requests.post(ollama_url, json=payload, timeout=12)
-        res.raise_for_status()
-        response_json = res.json()
-        return {"role": "assistant", "content": response_json.get("response", "Sorry, I couldn't generate a response.").strip()}
+        response_message = _post_json(ollama_chat_url, json=payload).get("message") or {}
+        tool_calls = []
+        for index, call in enumerate(response_message.get("tool_calls") or []):
+            function = call.get("function") or {}
+            arguments = function.get("arguments", {})
+            if not isinstance(arguments, str):
+                arguments = json.dumps(arguments)
+            tool_calls.append({
+                "id": call.get("id") or f"ollama_{len(messages)}_{index}",
+                "type": "function",
+                "function": {
+                    "name": function.get("name", ""),
+                    "arguments": arguments,
+                },
+            })
+        result = {
+            "role": "assistant",
+            "content": (response_message.get("content") or "").strip(),
+        }
+        if tool_calls:
+            result["tool_calls"] = tool_calls
+        return result
     except Exception:
         return None
 
@@ -314,12 +327,12 @@ def chat_with_llm(messages: list) -> dict:
     groq_api_key = config.get("groq_api_key", "")
     groq_model = config.get("groq_model", "openai/gpt-oss-20b")
     ollama_model = config.get("ollama_model", "llama3.1:8b")
-    ollama_url = config.get("ollama_url", "http://localhost:11434/api/generate")
+    ollama_chat_url = config.get("ollama_chat_url", "http://localhost:11434/api/chat")
 
     if provider == "groq" and groq_api_key:
         return _chat_with_groq(messages, groq_model, groq_api_key)
     elif provider == "ollama":
-        res = _chat_with_ollama(messages, ollama_model, ollama_url)
+        res = _chat_with_ollama(messages, ollama_model, ollama_chat_url)
         if res is not None:
             return res
         # Auto-fallback to Groq if configured
@@ -333,7 +346,7 @@ def chat_with_llm(messages: list) -> dict:
         # Provider is groq but missing key, or unknown provider
         if groq_api_key:
             return _chat_with_groq(messages, groq_model, groq_api_key)
-        res = _chat_with_ollama(messages, ollama_model, ollama_url)
+        res = _chat_with_ollama(messages, ollama_model, ollama_chat_url)
         if res is not None:
             return res
         return {

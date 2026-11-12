@@ -46,12 +46,12 @@ export default function SignupPage() {
             if (loginRes.ok && loginData.access_token) {
                 localStorage.setItem('access_token', loginData.access_token);
                 localStorage.setItem('isLoggedIn', 'true');
-                window.postMessage({ type: 'BAITLOCK_LOGIN', token: loginData.access_token }, '*');
+                window.postMessage({ type: 'BAITLOCK_LOGIN', token: loginData.access_token }, window.location.origin);
                 router.push('/dashboard');
             } else {
                 router.push('/login');
             }
-        } catch (err) {
+        } catch {
             setError("Network error. Is the server running?");
             setLoading(false);
         }

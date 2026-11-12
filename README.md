@@ -137,12 +137,19 @@ model bundle and model card. The service validates the bundle's feature schema a
 | `ENVIRONMENT` | `production` — the server refuses to start without a strong `SECRET_KEY` or with a wildcard CORS origin |
 | `SECRET_KEY` | a stable random secret: `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
 | `ALLOWED_ORIGINS` | your dashboard origin(s), comma-separated, e.g. `https://app.example.com` |
-| `DATABASE_URL` | a PostgreSQL URL (SQLite runs in WAL mode and is fine for a single instance) |
+| `DATABASE_URL` | `postgresql+psycopg://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require` (SQLite runs in WAL mode and is fine for a single instance) |
 | `LLM_PROVIDER` / `GROQ_API_KEY` | optional content analysis; detection works without it |
 
+Run schema migrations before starting the API. For PostgreSQL, use the `postgresql+psycopg://` URL shown above; URL-encode special characters in the username or password.
+
+For an existing database created by an earlier Baitlock release (before the migrations were complete), mark the old migration chain as applied once, then run the repair migration:
+
 ```bash
+uv run alembic stamp eeb12aaa3456
 uv run alembic upgrade head
 ```
+
+Use `alembic upgrade head` directly for a new database or a database that already has an Alembic revision recorded.
 ```bash
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers
 ```
@@ -156,9 +163,7 @@ at the reverse proxy because the in-process limiter is per worker.
 bun run build && bun run start
 ```
 
-**Extension**: edit `extension/config.js` (`API_BASE`, `APP_ORIGIN`) and the matching `host_permissions` and
-`content_scripts.matches` entries in `extension/manifest.json`, then rebuild the downloadable package
-(`client/public/baitlock-extension.zip`).
+**Extension**: use `scripts/build_extension.py` to generate a package for your HTTPS API and dashboard origins; see the release instructions below.
 
 **Health check**: `GET /api/v1/health` returns `healthy` only when the database is reachable and the shipped
 model artifact loaded (not the fallback model).
@@ -168,3 +173,64 @@ model artifact loaded (not the fallback model).
 ```bash
 cd server && uv run --with pytest python -m pytest -q tests
 ```
+
+## Audit fixes and deployment checks
+
+The original findings are preserved in `AUDIT_REPORT.md`; `AUDIT_RESOLUTION.md` tracks every finding against the current implementation.
+
+Authentication uses one-hour access tokens by default, with explicit sign-in after expiry. Sessions are capped at ten per account. Account deletion and sensitive profile changes require the current password. A password change revokes existing sessions. The API's server-side session check also rejects revoked, expired and inactive accounts.
+
+Community votes are advisory and cannot alter a detection verdict. The synthetic fraud model is disabled by default and always disabled in production. Production transaction screening uses deterministic rules until an independently validated model is provided; it is not a payment authorization system.
+
+### Run verification
+
+```bash
+uv sync --project server --frozen
+uv run --project server pytest -q server/tests
+python3 -m unittest discover -s tests -p 'test_*.py'
+node --test tests/extension.test.cjs
+cd client
+npm ci
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+The frontend bundles its Inter and Fira Code Latin fonts and their licenses, so production builds do not need Google Fonts access. CI runs the same checks automatically. Backend tests use isolated databases and mock external AI and page-fetch traffic.
+
+### Sign the model and migrate
+
+Set a separate, strong `MODEL_HMAC_KEY` in your deployment's secret store and trusted build environment. From `server/`, sign the known-good model before packaging:
+
+```bash
+uv run python -m app.features.phishing.phishing_ml --sign
+uv run alembic upgrade head
+```
+
+Ship the `.pkl.sig` with the artifact, and provide the same key to the API. Do not re-sign a model at server startup: signatures must establish trust before deserialization. Retraining must also update the reviewed constructor allowlist and model card when the artifact format changes.
+
+Back up existing databases before migration. Audit migrations retain distinct user/domain decisions, collapse duplicate decisions to their latest row and invalidate legacy sessions that lack the new session identifier. Historical raw session IPs are cleared; new sessions store network prefixes. Existing sessions may require a fresh sign-in after upgrading. An old database without migration history needs the repair procedure documented above; do not stamp a populated database to `head`.
+
+### Build a release extension
+
+```bash
+python3 scripts/build_extension.py \
+  --production \
+  --api https://YOUR_API_HOST/api/v1 \
+  --app https://YOUR_DASHBOARD_HOST \
+  --output client/public/baitlock-extension.zip
+```
+
+Use your actual HTTPS origins. The builder generates matching configuration, API/dashboard host permissions, content-script matches and connection CSP. It rejects insecure release URLs and replaces the output archive atomically. The checked-in unpacked extension remains configured for localhost development. It never asks for access to all sites merely to reach the API.
+
+The dashboard may sync an authenticated session into the extension after server validation. Signing in from the popup signs in the extension only; it no longer injects tokens into dashboard tabs. Expired sessions prompt a fresh sign-in. A failed scan holds the destination and offers an explicit continue button.
+
+### Containers and operations
+
+`compose.yaml` supplies API and dashboard services. Copy and configure `server/.env`, sign the trusted model, then run `docker compose up --build`. The example binds ports to loopback for a local HTTPS reverse proxy. Set the dashboard's public API URL at image build time. Set `ALLOWED_ORIGINS` to the real HTTPS dashboard origin, keep database and secret files private, and rate-limit at the ingress when running several workers or replicas. In-process rate limits and AI concurrency limits are per worker.
+
+Use `/api/v1/live` for process liveness and `/api/v1/ready` for readiness (503 if the database or shipped model is unavailable). `/api/v1/health` remains a diagnostic endpoint. Capture Uvicorn/application logs with your deployment platform, apply log retention there, and avoid logging authorization headers, page bodies or full scanned URL queries.
+
+The application uses explicit bearer headers rather than ambient authentication cookies; a separate CSRF cookie middleware is unnecessary for these endpoints. SQLAlchemy parameter binding and schema validation apply at their respective boundaries; blanket string sanitization can corrupt the URLs being analyzed. Store keys in your platform's secret manager and inject them as environment variables. Rotate provider keys there and restart workers; rotating the JWT key invalidates signed tokens, and rotating the model key requires re-signing the trusted artifact.
+
+See `PRIVACY.md` and `STORE_LISTING.md` for data handling and store submission materials. Public domains, deployment credentials, legal operator/contact details and real deployment screenshots must be supplied by the operator before publication. No deployment or store submission is performed by these changes.

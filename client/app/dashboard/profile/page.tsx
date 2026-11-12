@@ -1,9 +1,12 @@
 "use client";
 import { User, Mail, Shield, Key, ShieldCheck, Smartphone, Save, Trash2, Lock, Eye, EyeOff, X } from "lucide-react";
-import { useState, useEffect } from "react";
-import { API_BASE_URL, API_V1_URL } from "@/lib/api";
+import { useState, useEffect, useCallback } from "react";
+import { errorMessage, apiError, API_BASE_URL, API_V1_URL } from "@/lib/api";
 
 export default function ProfilePage() {
+  const [originalEmail, setOriginalEmail] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -21,75 +24,45 @@ export default function ProfilePage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 
-  const fetchProfile = async () => {
-    setLoading(true);
-    setStatusMessage(null);
-    try {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        setLoading(false);
-        window.location.href = '/login';
-        return;
-      }
-
-      let res: Response;
-      try {
-        res = await fetch(`${API_V1_URL}/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-      } catch (networkErr: any) {
-        console.warn("Backend server unreachable at", API_BASE_URL, networkErr?.message || networkErr);
-        setStatusMessage({
-          type: 'warning',
-          text: 'Cannot connect to backend server at ' + API_BASE_URL + '. Please make sure the FastAPI backend is running.'
-        });
-        setLoading(false);
-        return;
-      }
-
-      if (res.ok) {
-        const data = await res.json();
-        setEmail(data.email || "");
-        setFullName(data.full_name || "Admin User");
-      } else if (res.status === 401) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('isLoggedIn');
-        window.location.href = '/login';
-        return;
-      } else {
-        setStatusMessage({
-          type: 'error',
-          text: `Backend returned error ${res.status}: ${res.statusText}`
-        });
-      }
-
-      try {
-        const sessionsRes = await fetch(`${API_V1_URL}/auth/sessions`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (sessionsRes.ok) {
-          const sData = await sessionsRes.json();
-          setSessions(Array.isArray(sData) ? sData : []);
-        }
-      } catch {
-        // sessions fetch failure is non-fatal
-      }
-    } catch (error: any) {
-      console.warn("Error loading profile:", error?.message || error);
-      setStatusMessage({
-        type: 'error',
-        text: 'An unexpected error occurred while loading your profile.'
-      });
-    } finally {
-      setLoading(false);
+  const requestProfile = useCallback(async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) { window.location.href = '/login'; return null; }
+    const res = await fetch(`${API_V1_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.status === 401) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('isLoggedIn');
+      window.location.href = '/login';
+      return null;
     }
-  };
-
-  useEffect(() => {
-    fetchProfile();
+    if (!res.ok) throw new Error(`Profile request failed (${res.status})`);
+    const profile = await res.json();
+    const sessionsRes = await fetch(`${API_V1_URL}/auth/sessions`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+    const sessions = sessionsRes?.ok ? await sessionsRes.json() : [];
+    return { profile, sessions };
   }, []);
+
+  const applyProfile = useCallback((data: Awaited<ReturnType<typeof requestProfile>>) => {
+    if (data) {
+      setEmail(data.profile.email || "");
+      setOriginalEmail(data.profile.email || "");
+      setFullName(data.profile.full_name || "");
+      setSessions(Array.isArray(data.sessions) ? data.sessions : []);
+    }
+    setLoading(false);
+  }, []);
+
+  const profileError = useCallback((error: unknown) => {
+    console.warn("Profile load failed:", errorMessage(error));
+    setStatusMessage({ type: 'error', text: `Could not load your profile from ${API_BASE_URL}. Please retry.` });
+    setLoading(false);
+  }, []);
+
+  const fetchProfile = () => requestProfile().then(applyProfile).catch(profileError);
+  useEffect(() => {
+    let active = true;
+    requestProfile().then(data => { if (active) applyProfile(data); }).catch(error => { if (active) profileError(error); });
+    return () => { active = false; };
+  }, [requestProfile, applyProfile, profileError]);
 
   const handleSaveChanges = async () => {
     setSaving(true);
@@ -109,21 +82,24 @@ export default function ProfilePage() {
         },
         body: JSON.stringify({
           email,
-          full_name: fullName
+          full_name: fullName,
+          current_password: currentPassword || undefined
         })
       });
 
       if (res.ok) {
         const updated = await res.json();
         setEmail(updated.email || email);
+        setOriginalEmail(updated.email || email);
+        setCurrentPassword("");
         setFullName(updated.full_name || fullName);
         setStatusMessage({ type: 'success', text: 'Profile changes saved successfully!' });
       } else {
         const errData = await res.json().catch(() => ({}));
-        setStatusMessage({ type: 'error', text: errData.detail || 'Failed to update profile.' });
+        setStatusMessage({ type: 'error', text: apiError(errData.detail, 'Failed to update profile.') });
       }
-    } catch (e: any) {
-      console.warn("Failed to save profile:", e?.message || e);
+    } catch (e: unknown) {
+      console.warn("Failed to save profile:", errorMessage(e));
       setStatusMessage({ type: 'error', text: 'Network error saving changes. Please check if the backend is running.' });
     } finally {
       setSaving(false);
@@ -170,11 +146,15 @@ export default function ProfilePage() {
       });
 
       if (res.ok) {
-        setPasswordSuccess("Password updated successfully!");
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('isLoggedIn');
+        window.postMessage({ type: 'BAITLOCK_LOGOUT' }, window.location.origin);
+        setPasswordSuccess("Password updated. Please sign in again.");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
         setTimeout(() => {
+          window.location.href = "/login";
           setShowPasswordModal(false);
           setPasswordSuccess(null);
           setStatusMessage({
@@ -184,10 +164,10 @@ export default function ProfilePage() {
         }, 1200);
       } else {
         const errData = await res.json().catch(() => ({}));
-        setPasswordError(errData.detail || "Failed to update password.");
+        setPasswordError(apiError(errData.detail, "Failed to update password."));
       }
-    } catch (err: any) {
-      console.warn("Password change error:", err?.message || err);
+    } catch (err: unknown) {
+      console.warn("Password change error:", errorMessage(err));
       setPasswordError("Network error. Please make sure the backend server is reachable.");
     } finally {
       setIsChangingPassword(false);
@@ -195,17 +175,18 @@ export default function ProfilePage() {
   };
 
   const handleDeleteAccount = async () => {
-    if (!window.confirm("Are you sure you want to permanently delete your account? This action cannot be undone.")) return;
+    if (!deletePassword) return;
     try {
       const token = localStorage.getItem('access_token');
       const res = await fetch(`${API_V1_URL}/auth/me`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: deletePassword })
       });
       if (res.ok) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('isLoggedIn');
-        window.postMessage({ type: 'BAITLOCK_LOGOUT' }, '*');
+        window.postMessage({ type: 'BAITLOCK_LOGOUT' }, window.location.origin);
         window.location.href = '/';
       } else {
         alert("Failed to delete account");
@@ -249,7 +230,7 @@ export default function ProfilePage() {
           </div>
           {statusMessage.type === 'warning' && (
             <button
-              onClick={() => fetchProfile()}
+              onClick={() => { setLoading(true); setStatusMessage(null); fetchProfile(); }}
               className="px-3 py-1 text-xs font-semibold rounded-md bg-warning/15 hover:bg-warning/25 border border-warning/30 transition-colors"
             >
               Retry Connection
@@ -303,6 +284,12 @@ export default function ProfilePage() {
                 </div>
               </div>
 
+              {email !== originalEmail && (
+                <label className="block text-sm">Current password to change email
+                  <input type="password" autoComplete="current-password" value={currentPassword}
+                    onChange={e => setCurrentPassword(e.target.value)} className="w-full input-base p-2 mt-2" />
+                </label>
+              )}
               <div className="space-y-2">
                 <label className="text-[13px] text-muted-foreground font-medium">Password</label>
                 <div className="relative">
@@ -389,7 +376,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <div className="shrink-0">
-                  <button onClick={handleDeleteAccount} className="text-sm font-medium text-destructive border border-destructive/30 px-5 py-2.5 rounded-lg hover:bg-destructive/10 transition-colors cursor-pointer whitespace-nowrap w-full md:w-auto">
+                  <button onClick={() => setShowDeleteModal(true)} className="text-sm font-medium text-destructive border border-destructive/30 px-5 py-2.5 rounded-lg hover:bg-destructive/10 transition-colors cursor-pointer whitespace-nowrap w-full md:w-auto">
                     Delete Account
                   </button>
                 </div>
@@ -400,6 +387,21 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <form role="dialog" aria-modal="true" aria-labelledby="delete-title" className="surface-panel p-6 w-full max-w-md space-y-4"
+            onSubmit={e => { e.preventDefault(); handleDeleteAccount(); }}>
+            <h2 id="delete-title" className="text-lg font-semibold">Permanently delete your account?</h2>
+            <p>This removes your account and associated data. Enter your current password to confirm.</p>
+            <label className="block">Current password
+              <input autoFocus required type="password" autoComplete="current-password" value={deletePassword}
+                onChange={e => setDeletePassword(e.target.value)} className="w-full input-base p-2 mt-2" />
+            </label>
+            <button type="button" className="btn-secondary p-2 mr-3" onClick={() => { setShowDeleteModal(false); setDeletePassword(""); }}>Cancel</button>
+            <button type="submit" className="btn-destructive p-2">Delete permanently</button>
+          </form>
+        </div>
+      )}
       {/* Password Change Modal */}
       {showPasswordModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
@@ -442,13 +444,14 @@ export default function ProfilePage() {
             {/* Form */}
             <form onSubmit={handlePasswordChange} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground font-medium">Current Password (optional)</label>
+                <label className="text-xs text-muted-foreground font-medium">Current Password</label>
                 <div className="relative">
                   <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
                     type="password"
                     value={currentPassword}
-                    placeholder="Enter current password if applicable"
+                    required
+                    placeholder="Enter your current password"
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     className="w-full input-base py-2.5 pl-10 pr-4 text-sm"
                   />

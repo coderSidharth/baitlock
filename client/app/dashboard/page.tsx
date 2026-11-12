@@ -1,11 +1,12 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ShieldAlert, CheckCircle, Ban, Trash2, Download, CreditCard, X, RefreshCw, Zap } from "lucide-react";
-import { API_V1_URL } from "@/lib/api";
+import { errorMessage, API_V1_URL, type SecurityEvent, type ScoreResult } from "@/lib/api";
 
 export default function DashboardPage() {
   const [showLogs, setShowLogs] = useState(true);
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<SecurityEvent[]>([]);
+  const [clearingLogs, setClearingLogs] = useState(false);
   const [filterType, setFilterType] = useState('All');
   const [dbStatus, setDbStatus] = useState<'ok' | 'warning' | 'error'>('warning');
   const [llmStatus, setLlmStatus] = useState<'ok' | 'warning' | 'error'>('warning');
@@ -17,7 +18,7 @@ export default function DashboardPage() {
   const [fraudHour, setFraudHour] = useState("3");
   const [fraudGeoDistance, setFraudGeoDistance] = useState("4500");
   const [fraudLoading, setFraudLoading] = useState(false);
-  const [fraudResult, setFraudResult] = useState<any>(null);
+  const [fraudResult, setFraudResult] = useState<ScoreResult | null>(null);
 
   const averageScore = events.length > 0 ? Math.round(events.reduce((acc, evt) => acc + evt.score, 0) / events.length) : 100;
   const criticalEvents = events.filter(e => e.tier === 'critical' || e.tier === 'high');
@@ -27,7 +28,7 @@ export default function DashboardPage() {
   const topThreat = blockedSites[0] || criticalEvents[0];
   const filteredEvents = filterType === 'All' ? events : events.filter(e => e.type.toLowerCase() === filterType.toLowerCase());
 
-  const fetchEvents = () => {
+  const fetchEvents = useCallback(async () => {
     let url = `${API_V1_URL}/events?limit=20`;
     if (filterType !== 'All') {
       url += `&type=${filterType.toLowerCase()}`;
@@ -35,17 +36,43 @@ export default function DashboardPage() {
     const token = localStorage.getItem('access_token');
     const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-    fetch(url, { headers })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.events) setEvents(data.events);
-      })
-      .catch(err => console.warn("Dashboard events fetch warning:", err?.message || err));
+    try {
+      const res = await fetch(url, { headers });
+      if (!res.ok) return false;
+      const data = await res.json();
+      return data?.events as SecurityEvent[] | undefined;
+    } catch (err: unknown) {
+      console.warn("Dashboard events fetch warning:", errorMessage(err));
+      return false;
+    }
+  }, [filterType]);
+
+  const refreshEvents = async () => {
+    const data = await fetchEvents();
+    if (data) setEvents(data);
+    return Boolean(data);
   };
 
-  const handleClearLogs = () => {
-    setEvents([]);
-    setShowLogs(false);
+  const handleClearLogs = async () => {
+    if (!window.confirm("Permanently clear your security events?")) return;
+    setClearingLogs(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(`${API_V1_URL}/events`, {
+        method: "DELETE",
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      setEvents([]);
+      setShowLogs(false);
+      if (!await refreshEvents()) {
+        alert("Logs were deleted, but the dashboard could not refresh the feed.");
+      }
+    } catch (err: unknown) {
+      alert(`Could not clear logs: ${errorMessage(err)}`);
+    } finally {
+      setClearingLogs(false);
+    }
   };
 
   const handleExportLogs = () => {
@@ -90,12 +117,12 @@ export default function DashboardPage() {
       if (res.ok) {
         const data = await res.json();
         setFraudResult(data);
-        fetchEvents();
+        refreshEvents();
       } else {
         alert("Failed to analyze transaction.");
       }
-    } catch (err: any) {
-      alert("Error scoring transaction: " + (err?.message || err));
+    } catch (err: unknown) {
+      alert("Error scoring transaction: " + (errorMessage(err)));
     } finally {
       setFraudLoading(false);
     }
@@ -127,8 +154,10 @@ export default function DashboardPage() {
         setLlmStatus('error');
       });
 
-    fetchEvents();
-  }, [filterType]);
+    let active = true;
+    fetchEvents().then(data => { if (active && data) setEvents(data); });
+    return () => { active = false; };
+  }, [fetchEvents]);
 
   return (
     <>
@@ -150,9 +179,9 @@ export default function DashboardPage() {
               Restore logs
             </button>
           ) : (
-            <button onClick={handleClearLogs} className="flex items-center gap-2 px-3.5 py-2 rounded-lg btn-secondary text-sm font-medium text-destructive hover:text-destructive cursor-pointer">
+            <button onClick={handleClearLogs} disabled={clearingLogs} className="flex items-center gap-2 px-3.5 py-2 rounded-lg btn-secondary text-sm font-medium text-destructive hover:text-destructive cursor-pointer disabled:opacity-50">
               <Trash2 className="w-4 h-4" />
-              Clear logs
+              {clearingLogs ? "Clearing…" : "Clear logs"}
             </button>
           )}
           <button onClick={handleExportLogs} className="flex items-center gap-2 px-3.5 py-2 rounded-lg btn-secondary text-sm font-medium cursor-pointer">

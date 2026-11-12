@@ -1,0 +1,22 @@
+services:
+  api:
+    build: ./server
+    env_file: ./server/.env
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: sqlite:////data/events.db
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: ["baitlock-data:/data"]
+    restart: unless-stopped
+  dashboard:
+    build:
+      context: ./client
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  baitlock-data:

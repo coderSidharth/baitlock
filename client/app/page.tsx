@@ -1,21 +1,26 @@
 "use client";
 import Link from 'next/link';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ShieldAlert, ArrowLeft, Shield } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 
+const subscribeAuth = (notify: () => void) => {
+  window.addEventListener("storage", notify);
+  return () => window.removeEventListener("storage", notify);
+};
+const readAuth = () => localStorage.getItem("isLoggedIn") === "true";
+const serverAuth = () => false;
+
 function HomeContent() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const isLoggedIn = useSyncExternalStore(subscribeAuth, readAuth, serverAuth);
   const searchParams = useSearchParams();
   const isBlocked = searchParams.get('blocked') === 'true';
   const blockedUrl = searchParams.get('url') || 'Unknown URL';
   const score = searchParams.get('score') || '100';
   const tier = searchParams.get('tier') || 'critical';
 
-  useEffect(() => {
-    setIsLoggedIn(localStorage.getItem('isLoggedIn') === 'true');
-  }, []);
+
 
   if (isBlocked) {
     return (

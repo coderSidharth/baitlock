@@ -1,4 +1,3 @@
-import re
 import ipaddress
 from urllib.parse import urlparse
 
@@ -73,6 +72,10 @@ def rule_check_transaction(amount: float, velocity: int, hour: int, geo_distance
         score -= 50
         reasons.append("Extremely high transaction frequency")
         
+    if hour < 5 and velocity > 5:
+        score -= 20
+        reasons.append("High transaction frequency during overnight hours")
+
     if geo_distance > 5000:
         score -= 50
         reasons.append("Impossible travel distance (geo-velocity rule)")

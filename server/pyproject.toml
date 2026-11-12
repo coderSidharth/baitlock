@@ -5,25 +5,29 @@ description = "Baitlock — Real-time phishing and fraud detection backend"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "alembic>=1.18.5",
-    "fastapi[standard]>=0.141.1",
-    "uvicorn>=0.52.0",
+    "alembic>=1.18.5,<2",
+    "fastapi[standard]>=0.141.1,<1",
+    "uvicorn>=0.52.0,<1",
     # Database
-    "sqlalchemy>=2.0.0",
+    "sqlalchemy>=2.0.0,<3",
+    "psycopg[binary]>=3.2.0,<4",
     # Config
-    "pydantic-settings>=2.0.0",
+    "pydantic-settings>=2.0.0,<3",
     # AI dependencies
-    "jellyfish>=1.2.1",
-    "tldextract>=5.1.0",
-    "numpy>=2.0.0",
-    "scikit-learn>=1.5.0",
-    "threadpoolctl>=3.1.0",
-    "python-dotenv>=1.0.0",
-    "requests>=2.31.0",
+    "jellyfish>=1.2.1,<2",
+    "tldextract>=5.1.0,<6",
+    "numpy>=2.0.0,<3",
+    "scikit-learn>=1.5.0,<2",
+    "threadpoolctl>=3.1.0,<4",
+    "python-dotenv>=1.0.0,<2",
+    "requests>=2.31.0,<3",
     # Auth
-    "pyjwt>=2.8.0",
-    "google-auth>=2.27.0",
-    "bcrypt>=4.0.0",
-    "email-validator>=2.0.0",
-    "python-multipart>=0.0.9",
+    "pyjwt>=2.8.0,<3",
+    "google-auth>=2.27.0,<3",
+    "bcrypt>=4.0.0,<6",
+    "email-validator>=2.0.0,<3",
+    "python-multipart>=0.0.9,<1",
 ]
+
+[dependency-groups]
+dev = ["pytest>=8,<10"]

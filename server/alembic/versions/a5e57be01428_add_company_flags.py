@@ -26,13 +26,16 @@ def upgrade() -> None:
     sa.Column('domain', sa.String(), nullable=False),
     sa.Column('flag_type', sa.String(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id', 'domain', 'flag_type', name='uq_user_domain_flag')
     )
     with op.batch_alter_table('company_flags', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_company_flags_domain'), ['domain'], unique=False)
         batch_op.create_index(batch_op.f('ix_company_flags_id'), ['id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_company_flags_user_id'), ['user_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_company_flags_created_at'), ['created_at'], unique=False)
 
     # ### end Alembic commands ###
 

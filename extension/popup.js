@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', async () => {
+    if (typeof BAITLOCK_CONFIG === "undefined") {
+        document.getElementById("login-error")?.classList.remove("hidden");
+        document.getElementById("login-error").textContent = "Configuration failed. Reload the extension.";
+        return;
+    }
     const API_BASE = BAITLOCK_CONFIG.API_BASE;
     let token = null;
 
@@ -12,7 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loginPassword = document.getElementById('login-password');
     const loginBtn = document.getElementById('login-btn');
     const loginSpinner = document.getElementById('login-spinner');
-    const loginBtnText = loginBtn.querySelector('.btn-text');
+    const loginBtnText = loginBtn?.querySelector('.btn-text');
     const loginError = document.getElementById('login-error');
     const logoutBtn = document.getElementById('logout-btn');
 
@@ -20,7 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const currentUrlEl = document.getElementById('current-url');
     const scanBtn = document.getElementById('scan-btn');
     const spinner = document.getElementById('spinner');
-    const btnText = scanBtn.querySelector('.btn-text');
+    const btnText = scanBtn?.querySelector('.btn-text');
     const resultContainer = document.getElementById('result-container');
     const errorContainer = document.getElementById('error-container');
     const errorMessage = document.getElementById('error-message');
@@ -33,16 +38,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentTab = null;
     let currentDomain = null;
 
-    // Initialization: Check Token
-    chrome.storage.local.get(['baitlock_token'], async (res) => {
-        if (res.baitlock_token) {
-            token = res.baitlock_token;
-            showScanView();
-        } else {
+    if ([viewLogin, viewScan, loginForm, loginEmail, loginPassword, loginBtn, loginSpinner,
+         loginBtnText, loginError, logoutBtn, currentUrlEl, scanBtn, spinner, btnText,
+         resultContainer, errorContainer, errorMessage, flagLegitBtn, flagMaliciousBtn, flagStatus].some(el => !el)) {
+        console.error("Baitlock popup markup is incomplete");
+        return;
+    }
+
+    async function apiFetch(url, options = {}) {
+        const response = await fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
+        if (response.status === 401) {
+            token = null;
+            await chrome.storage.local.remove("baitlock_token");
             showLoginView();
+            loginError.textContent = "Your session expired. Please sign in again.";
+            loginError.classList.remove("hidden");
         }
-        await initCurrentTab();
-    });
+        return response;
+    }
+
+    const stored = await chrome.storage.local.get("baitlock_token");
+    if (baitlockTokenValid(stored.baitlock_token)) {
+        token = stored.baitlock_token;
+        try {
+            const me = await apiFetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+            if (me.ok) showScanView(); else showLoginView();
+        } catch { showLoginView(); }
+    } else {
+        await chrome.storage.local.remove("baitlock_token");
+        showLoginView();
+    }
+    await initCurrentTab();
 
     async function initCurrentTab() {
         try {
@@ -97,34 +123,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         viewScan.style.display = 'block';
     }
 
-    // Sync auth to Web App
-    function syncWebAuth(action, tokenValue = null) {
-        chrome.tabs.query({ url: `${BAITLOCK_CONFIG.APP_ORIGIN}/*` }, (tabs) => {
-            tabs.forEach(tab => {
-                chrome.scripting.executeScript({
-                    target: { tabId: tab.id },
-                    func: (act, tok) => {
-                        if (act === 'login') {
-                            localStorage.setItem('access_token', tok);
-                            localStorage.setItem('isLoggedIn', 'true');
-                            window.location.reload();
-                        } else if (act === 'logout') {
-                            localStorage.removeItem('access_token');
-                            localStorage.removeItem('isLoggedIn');
-                            window.location.reload();
-                        }
-                    },
-                    args: [action, tokenValue]
-                });
-            });
-        });
-    }
-
     // Login Handler
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = loginEmail.value.trim();
-        const password = loginPassword.value.trim();
+        const password = loginPassword.value;
         if (!email || !password) return;
 
         loginBtn.disabled = true;
@@ -137,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             formData.append('username', email);
             formData.append('password', password);
 
-            const res = await fetch(`${API_BASE}/auth/login`, {
+            const res = await apiFetch(`${API_BASE}/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: formData
@@ -165,9 +168,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             const data = await res.json();
+            if (!baitlockTokenValid(data.access_token)) throw new Error("Server returned an invalid token");
             token = data.access_token;
             chrome.storage.local.set({ baitlock_token: token });
-            syncWebAuth('login', token);
+
             showScanView();
         } catch (err) {
             loginError.textContent = err.message;
@@ -182,7 +186,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     logoutBtn.addEventListener('click', async () => {
         if (token) {
             try {
-                await fetch(`${API_BASE}/auth/logout`, {
+                await apiFetch(`${API_BASE}/auth/logout`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -192,7 +196,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         token = null;
         chrome.storage.local.remove('baitlock_token');
-        syncWebAuth('logout');
+
         showLoginView();
         resultContainer.classList.add('hidden');
     });
@@ -223,10 +227,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const headers = { "Content-Type": "application/json" };
             if (token) headers["Authorization"] = `Bearer ${token}`;
 
-            const response = await fetch(`${API_BASE}/phishing/check`, {
+            const response = await apiFetch(`${API_BASE}/phishing/check`, {
                 method: "POST",
                 headers,
-                body: JSON.stringify({ url: currentTab.url, page_text: pageText || undefined })
+                body: JSON.stringify({ url: currentUrlEl.textContent, page_text: pageText || undefined })
             });
 
             if (!response.ok) {
@@ -270,7 +274,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         flagMaliciousBtn.disabled = true;
         
         try {
-            const res = await fetch(`${API_BASE}${endpoint}`, {
+            const res = await apiFetch(`${API_BASE}${endpoint}`, {
                 method: "POST",
                 headers: { 
                     "Content-Type": "application/json",
@@ -280,7 +284,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             if (res.ok) {
                 // Record community reputation flag
-                fetch(`${API_BASE}/companies/flag`, {
+                const community = await apiFetch(`${API_BASE}/companies/flag`, {
                     method: "POST",
                     headers: { 
                         "Content-Type": "application/json",
@@ -290,7 +294,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                         url: currentDomain,
                         flag_type: flagType === 'whitelist' ? 'legitimate' : 'malicious'
                     })
-                }).catch(() => {});
+                });
+                if (!community.ok) {
+                    flagStatus.textContent = "Personal list saved; the community vote could not be recorded.";
+                    flagStatus.className = "flag-status error";
+                    flagStatus.classList.remove("hidden");
+                    return;
+                }
 
                 flagStatus.textContent = flagType === 'whitelist' 
                     ? "Added to your personal whitelist!" 
@@ -377,7 +387,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('breakdown-container').classList.remove('hidden');
             document.getElementById('bd-rule').textContent = data.breakdown.rule_score || 0;
             document.getElementById('bd-ml').textContent = data.breakdown.ml_score || 0;
-            document.getElementById('bd-llm').textContent = data.breakdown.llm_score || 0;
+            document.getElementById('bd-llm').textContent = data.breakdown.llm_score ?? 'Not run';
         } else {
             document.getElementById('breakdown-container').classList.add('hidden');
         }

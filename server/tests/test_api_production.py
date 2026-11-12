@@ -49,7 +49,12 @@ def client():
             db.close()
 
     app.dependency_overrides[get_db] = _get_db
-    auth_router.login_limiter._hits.clear()
+    auth_router.login_limiter.clear()
+    from app.features.phishing.router import scan_limiter
+    from app.features.chat.router import chat_limiter
+    from app.features.companies.router import flag_limiter
+    for limiter in (scan_limiter, chat_limiter, flag_limiter):
+        limiter.clear()
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
@@ -57,7 +62,8 @@ def client():
 
 
 def _auth(client, email="user@example.com", password="correct-horse-battery"):
-    client.post("/api/v1/auth/register", json={"email": email, "password": password})
+    registered = client.post("/api/v1/auth/register", json={"email": email, "password": password})
+    assert registered.status_code == 200, registered.text
     r = client.post("/api/v1/auth/login", data={"username": email, "password": password})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
@@ -132,7 +138,8 @@ def test_shipped_model_artifact_loads_with_matching_schema():
 def test_incompatible_artifact_falls_back_safely(tmp_path):
     bad = tmp_path / "legacy.pkl"
     import pickle
-    pickle.dump({"model": object(), "feature_names": ["old_feature"]}, open(bad, "wb"))
+    with bad.open("wb") as handle:
+        pickle.dump({"model": object(), "feature_names": ["old_feature"]}, handle)
     try:
         status = phishing_ml.reload_model(bad)
         assert status["source"] == "fallback"
@@ -144,7 +151,8 @@ def test_incompatible_artifact_falls_back_safely(tmp_path):
 def test_reference_detection_end_to_end(client):
     """Fast-path verdicts the extension acts on: block phishing, don't block real sites."""
     h = _auth(client)
-    blocked = lambda r: r["tier"] in ("high", "critical")  # noqa: E731
+    def blocked(result):
+        return result["tier"] in ("high", "critical")
     phishing_hits = sum(
         blocked(client.post("/api/v1/phishing/check", json={"url": u, "fast_mode": True}, headers=h).json())
         for u in PHISHING_REFERENCE)
@@ -249,7 +257,7 @@ def test_transaction_labels_cannot_be_whitelisted_or_blocked(client):
 
 def test_domain_validation_rules():
     from app.features.phishing.service import is_valid_domain
-    for ok in ("example.com", "a.b.example.org", "xn--pple-43d.com", "10.0.0.1", "my_host.example.net"):
+    for ok in ("example.com", "a.b.example.org", "xn--pple-43d.com", "10.0.0.1", "my-host.example.net"):
         assert is_valid_domain(ok), ok
-    for bad in ("txn", "", "-bad.com", "bad-.com", "example.c0m", "exa mple.com", "localhost"):
+    for bad in ("my_host.example.net", "txn", "", "-bad.com", "bad-.com", "example.c0m", "exa mple.com", "localhost"):
         assert not is_valid_domain(bad), bad

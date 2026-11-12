@@ -20,3 +20,35 @@ export function getAuthHeaders(): HeadersInit {
   }
   return headers;
 }
+
+
+export type RiskTier = "safe" | "moderate" | "high" | "critical";
+export interface SecurityEvent {
+  id: string;
+  type: "phishing" | "fraud";
+  target: string;
+  score: number;
+  verdict: string;
+  tier: RiskTier;
+  reasons: string[];
+  created_at: string;
+}
+export interface ScoreResult {
+  breakdown: { rule_score: number; ml_score: number; llm_score: number | null };
+  final_score: number;
+  verdict: string;
+  tier: RiskTier;
+  reasons: string[];
+}
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+export function apiError(detail: unknown, fallback: string): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) return detail.map(item => apiError(item, fallback)).join(", ");
+  if (detail && typeof detail === "object") {
+    if ("msg" in detail) return String(detail.msg);
+    if ("message" in detail) return String(detail.message);
+  }
+  return fallback;
+}

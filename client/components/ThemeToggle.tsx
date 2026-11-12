@@ -1,15 +1,17 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Sun, Moon } from "lucide-react";
 
-export default function ThemeToggle({ className = "" }: { className?: string }) {
-    const [dark, setDark] = useState(false);
-    const [mounted, setMounted] = useState(false);
+const subscribe = (notify: () => void) => {
+    const observer = new MutationObserver(notify);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+};
+const snapshot = () => document.documentElement.classList.contains("dark");
+const serverSnapshot = () => false;
 
-    useEffect(() => {
-        setMounted(true);
-        setDark(document.documentElement.classList.contains("dark"));
-    }, []);
+export default function ThemeToggle({ className = "" }: { className?: string }) {
+    const dark = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
 
     const toggle = () => {
         const next = !document.documentElement.classList.contains("dark");
@@ -19,7 +21,6 @@ export default function ThemeToggle({ className = "" }: { className?: string }) 
         } catch {
             /* ignore storage errors */
         }
-        setDark(next);
     };
 
     return (
@@ -27,10 +28,10 @@ export default function ThemeToggle({ className = "" }: { className?: string }) 
             type="button"
             onClick={toggle}
             aria-label="Toggle color theme"
-            title={mounted ? (dark ? "Switch to light mode" : "Switch to dark mode") : "Toggle theme"}
+            title={dark ? "Switch to light mode" : "Switch to dark mode"}
             className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer ${className}`}
         >
-            {mounted && dark ? <Sun size={16} /> : <Moon size={16} />}
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
         </button>
     );
 }

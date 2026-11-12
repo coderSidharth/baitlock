@@ -1,9 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 from app.core.database import Base
-from datetime import datetime, timezone
-
-def _utc_now():
-    return datetime.now(timezone.utc)
+from app.common.time import utc_now
 
 class FraudEvent(Base):
     __tablename__ = "fraud_events"
@@ -16,4 +13,4 @@ class FraudEvent(Base):
     final_score = Column(Float)
     verdict = Column(String)
     reasons_jsonb = Column(String)
-    created_at = Column(DateTime(timezone=True), default=_utc_now, index=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now, index=True)

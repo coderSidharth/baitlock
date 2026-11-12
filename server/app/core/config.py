@@ -1,7 +1,11 @@
 import logging
 import secrets
+from pathlib import Path
 
-from pydantic import PrivateAttr
+SERVER_ROOT = Path(__file__).resolve().parents[2]
+
+from pydantic import PrivateAttr, Field, field_validator
+from sqlalchemy.engine import make_url
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger("baitlock.config")
@@ -17,11 +21,12 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # SQLite for development; use postgresql://... in production.
-    DATABASE_URL: str = "sqlite:///./events.db"
+    DATABASE_URL: str = f"sqlite:///{SERVER_ROOT / 'events.db'}"
 
     LLM_PROVIDER: str = "ollama"
     OLLAMA_MODEL: str = "llama3.1:8b"
     OLLAMA_URL: str = "http://localhost:11434/api/generate"
+    OLLAMA_CHAT_URL: str = "http://localhost:11434/api/chat"
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "openai/gpt-oss-20b"
 
@@ -29,18 +34,35 @@ class Settings(BaseSettings):
     # per-process key invalidates tokens on restart and across workers.
     SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 1 week
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, ge=5, le=1440)  # Re-authenticate after one hour.
+    MAX_SESSIONS_PER_USER: int = Field(default=10, ge=1, le=100)
+    ENABLE_DEMO_FRAUD_MODEL: bool = False
+    LLM_MAX_CONCURRENT: int = Field(default=4, ge=1, le=8)
+    LLM_TIMEOUT_SECONDS: int = Field(default=8, ge=1, le=15)
 
     # Comma-separated list of web origins allowed to call the API (the dashboard).
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
-    # Brute-force protection for /auth/login (failed attempts per window).
-    LOGIN_RATE_LIMIT: int = 10
-    LOGIN_RATE_WINDOW_SECONDS: int = 900
+    # HMAC key for verifying ML model artifact integrity.
+    # If empty in dev, signature verification is skipped with a warning.
+    MODEL_HMAC_KEY: str = ""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # Brute-force protection for /auth/login (failed attempts per window).
+    LOGIN_RATE_LIMIT: int = Field(default=10, ge=1, le=1000)
+    LOGIN_RATE_WINDOW_SECONDS: int = Field(default=900, ge=1, le=86400)
+
+    model_config = SettingsConfigDict(env_file=SERVER_ROOT / ".env", env_file_encoding="utf-8", extra="ignore")
 
     _ephemeral_secret: bool = PrivateAttr(default=False)
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def absolute_sqlite_path(cls, value: str) -> str:
+        url = make_url(value)
+        if url.get_backend_name() == "sqlite" and url.database not in (None, "", ":memory:"):
+            if not Path(url.database).is_absolute():
+                url = url.set(database=str((SERVER_ROOT / url.database).resolve()))
+        return url.render_as_string(hide_password=False)
 
     @property
     def is_production(self) -> bool:
@@ -59,7 +81,7 @@ class Settings(BaseSettings):
             if self.is_production:
                 raise RuntimeError(
                     "SECRET_KEY is not set. In production it must be a strong, stable secret "
-                    "(generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\")."
+                    "Generate a stable secret with secrets.token_urlsafe(64)."
                 )
             # Development convenience: an ephemeral key (tokens reset on restart).
             self.SECRET_KEY = secrets.token_urlsafe(64)

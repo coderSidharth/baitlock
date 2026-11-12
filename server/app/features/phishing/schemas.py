@@ -17,8 +17,16 @@ class PhishingCheckRequest(BaseModel):
     @field_validator("url", mode="after")
     @classmethod
     def validate_url_scheme(cls, v: str) -> str:
-        if not any(v.lower().startswith(s) for s in ("http://", "https://", "ftp://")):
-            raise ValueError("URL must start with a valid scheme (http://, https://, or ftp://)")
+        if not any(v.lower().startswith(s) for s in ("http://", "https://")):
+            raise ValueError("URL must start with a valid scheme (http:// or https://)")
+        from urllib.parse import urlparse
+        parsed = urlparse(v)
+        try:
+            port = parsed.port
+        except ValueError as exc:
+            raise ValueError("Invalid URL port") from exc
+        if not parsed.hostname or any(c.isspace() or ord(c) < 32 for c in v):
+            raise ValueError("URL must contain a hostname and no whitespace")
         return v
 
     @field_validator("page_text", mode="before")

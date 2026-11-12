@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Shield } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
-import { API_V1_URL } from '@/lib/api';
+import { API_V1_URL, apiError } from '@/lib/api';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -32,17 +32,7 @@ export default function LoginPage() {
                 });
                 const data = await res.json();
                 if (!res.ok) {
-                    const detail = data.detail;
-                    let message = 'Registration failed';
-                    if (typeof detail === 'string') {
-                        message = detail;
-                    } else if (Array.isArray(detail)) {
-                        message = detail
-                            .map((d: any) => (typeof d === 'object' && d !== null) ? (d.msg || JSON.stringify(d)) : String(d))
-                            .join(', ');
-                    } else if (detail && typeof detail === 'object') {
-                        message = (detail as any).msg || (detail as any).message || JSON.stringify(detail);
-                    }
+                    const message = apiError(data.detail, 'Registration failed');
                     setError(message);
                     setLoading(false);
                     return;
@@ -62,7 +52,7 @@ export default function LoginPage() {
                 if (loginRes.ok && loginData.access_token) {
                     localStorage.setItem('access_token', loginData.access_token);
                     localStorage.setItem('isLoggedIn', 'true');
-                    window.postMessage({ type: 'BAITLOCK_LOGIN', token: loginData.access_token }, '*');
+                    window.postMessage({ type: 'BAITLOCK_LOGIN', token: loginData.access_token }, window.location.origin);
                     router.push('/dashboard');
                     return;
                 }
@@ -83,27 +73,17 @@ export default function LoginPage() {
                 });
                 const data = await res.json();
                 if (!res.ok) {
-                    const detail = data.detail;
-                    let message = 'Invalid credentials';
-                    if (typeof detail === 'string') {
-                        message = detail;
-                    } else if (Array.isArray(detail)) {
-                        message = detail
-                            .map((d: any) => (typeof d === 'object' && d !== null) ? (d.msg || JSON.stringify(d)) : String(d))
-                            .join(', ');
-                    } else if (detail && typeof detail === 'object') {
-                        message = (detail as any).msg || (detail as any).message || JSON.stringify(detail);
-                    }
+                    const message = apiError(data.detail, 'Invalid credentials');
                     setError(message);
                     setLoading(false);
                     return;
                 }
                 localStorage.setItem('access_token', data.access_token);
                 localStorage.setItem('isLoggedIn', 'true');
-                window.postMessage({ type: 'BAITLOCK_LOGIN', token: data.access_token }, '*');
+                window.postMessage({ type: 'BAITLOCK_LOGIN', token: data.access_token }, window.location.origin);
                 router.push('/dashboard');
             }
-        } catch (err) {
+        } catch {
             setError('Could not connect to server. Make sure the backend is running.');
             setLoading(false);
         }

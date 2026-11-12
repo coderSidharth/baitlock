@@ -1,27 +1,20 @@
-// Synchronizes Web App auth state to Extension
-
-function syncTokenFromWeb() {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-        chrome.storage.local.set({ baitlock_token: token });
-    } else {
-        chrome.storage.local.remove('baitlock_token');
-    }
-}
-
-// 1. Check on initial page load
-syncTokenFromWeb();
-
-// 2. Listen for explicit messages from the web app
-window.addEventListener('message', (event) => {
-    // Only accept messages from same origin
-    if (event.origin !== window.location.origin) return;
-
-    if (event.data && event.data.type === 'BAITLOCK_LOGIN') {
-        if (event.data.token) {
-            chrome.storage.local.set({ baitlock_token: event.data.token });
-        }
-    } else if (event.data && event.data.type === 'BAITLOCK_LOGOUT') {
-        chrome.storage.local.remove('baitlock_token');
-    }
-});
+// This bridge shares the dashboard's trust boundary; an XSS there still requires
+// fixing in the dashboard. Only the backend can authenticate a token.
+(() => {
+    if (!baitlockIsAppUrl(location.href)) return;
+    const sync = () => {
+        try {
+            const token = localStorage.getItem("access_token");
+            if (token !== null && !baitlockTokenValid(token)) return;
+            chrome.runtime.sendMessage({ type: "BAITLOCK_AUTH_SYNC", token }).catch(console.warn);
+        } catch (error) { console.warn("Baitlock auth sync unavailable", error); }
+    };
+    sync();
+    window.addEventListener("storage", (event) => {
+        if (event.key === "access_token" || event.key === null) sync();
+    });
+    window.addEventListener("message", (event) => {
+        if (event.source !== window || event.origin !== location.origin) return;
+        if (["BAITLOCK_LOGIN", "BAITLOCK_LOGOUT"].includes(event.data?.type)) sync();
+    });
+})();

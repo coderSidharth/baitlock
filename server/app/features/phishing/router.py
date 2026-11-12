@@ -1,20 +1,26 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.features.auth.models import User
 from app.api.deps import get_db, get_optional_user, get_current_user
 from app.features.phishing.schemas import PhishingCheckRequest, PhishingScoreResponse, WhitelistRequest
-from app.features.phishing.service import score_phishing_service, normalize_domain, set_whitelisted, set_blocklisted
+from app.features.phishing.service import score_phishing_service, require_domain, set_whitelisted, set_blocklisted
 from app.features.phishing.models import UserWhitelist, UserBlocklist
 
+from app.core.rate_limit import FailedLoginLimiter
+scan_limiter = FailedLoginLimiter(240, 60)
 router = APIRouter()
 
 @router.post("/check", response_model=PhishingScoreResponse)
 def check_phishing(
-    req: PhishingCheckRequest, 
+    req: PhishingCheckRequest,
+    request: Request,
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_optional_user)
 ):
+    wait = scan_limiter.consume((request.client.host if request.client else "unknown", "scan"))
+    if wait:
+        raise HTTPException(429, "Scan rate limit reached", headers={"Retry-After": str(wait)})
     user_id = user.id if user else None
     return score_phishing_service(db, req.url, req.page_text, user_id=user_id, fast_mode=req.fast_mode)
 
@@ -44,22 +50,28 @@ def add_to_whitelist(
 
 @router.delete("/whitelist")
 def remove_from_whitelist(
-    req: WhitelistRequest,
+    req: WhitelistRequest | None = None,
+    domain: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
     user_id = user.id
-    domain = normalize_domain(req.domain)
+    if domain is None and req is None:
+        raise HTTPException(422, "domain is required")
+    try:
+        domain = require_domain(domain if domain is not None else req.domain)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     existing = db.query(UserWhitelist).filter(
         UserWhitelist.user_id == user_id,
         UserWhitelist.domain == domain
     ).first()
-    
+
     if existing:
         db.delete(existing)
         db.commit()
         return {"status": "success", "message": f"{domain} has been removed from your personal whitelist."}
-    
+
     return {"status": "error", "message": "Domain not found in whitelist."}
 
 @router.get("/blocklist")
@@ -88,20 +100,26 @@ def add_to_blocklist(
 
 @router.delete("/blocklist")
 def remove_from_blocklist(
-    req: WhitelistRequest,
+    req: WhitelistRequest | None = None,
+    domain: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
     user_id = user.id
-    domain = normalize_domain(req.domain)
+    if domain is None and req is None:
+        raise HTTPException(422, "domain is required")
+    try:
+        domain = require_domain(domain if domain is not None else req.domain)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     existing = db.query(UserBlocklist).filter(
         UserBlocklist.user_id == user_id,
         UserBlocklist.domain == domain
     ).first()
-    
+
     if existing:
         db.delete(existing)
         db.commit()
         return {"status": "success"}
-    
+
     return {"status": "error"}

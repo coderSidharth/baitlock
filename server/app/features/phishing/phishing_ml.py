@@ -20,6 +20,9 @@ URLs so the service keeps working, and /health reports the degraded state.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import io
 import logging
 import pickle
 import threading
@@ -34,6 +37,81 @@ from .reference_urls import BENIGN_REFERENCE, PHISHING_REFERENCE
 logger = logging.getLogger("baitlock.ml")
 
 MODEL_PATH = Path(__file__).parent / "phishing_url_model.pkl"
+
+# ---------------------------------------------------------------------------
+# Security: restricted unpickler + HMAC signature verification
+# ---------------------------------------------------------------------------
+
+# This is defense in depth; HMAC verification is the trust boundary in production.
+_SAFE_GLOBALS = {
+    ("sklearn.ensemble._hist_gradient_boosting.gradient_boosting", "HistGradientBoostingClassifier"),
+    ("sklearn.compose._column_transformer", "ColumnTransformer"),
+    ("sklearn.preprocessing._encoders", "OrdinalEncoder"),
+    ("sklearn.preprocessing._function_transformer", "FunctionTransformer"),
+    ("sklearn.preprocessing._label", "LabelEncoder"),
+    ("sklearn.utils.validation", "check_array"),
+    ("sklearn._loss.loss", "HalfBinomialLoss"),
+    ("sklearn._loss.link", "LogitLink"),
+    ("sklearn._loss.link", "Interval"),
+    ("sklearn._loss._loss", "CyHalfBinomialLoss"),
+    ("sklearn.ensemble._hist_gradient_boosting.binning", "_BinMapper"),
+    ("sklearn.ensemble._hist_gradient_boosting.predictor", "TreePredictor"),
+    ("numpy", "dtype"), ("numpy", "float64"),
+    ("numpy._core.numeric", "_frombuffer"),
+    ("numpy._core.multiarray", "scalar"),
+    ("numpy.random._pickle", "__generator_ctor"),
+    ("numpy.random._pickle", "__bit_generator_ctor"),
+    ("numpy.random._pcg64", "PCG64"),
+    ("numpy.random.bit_generator", "__pyx_unpickle_SeedSequence"),
+    ("numpy.random.bit_generator", "SeedSequence"),
+    ("functools", "partial"), ("builtins", "slice"),
+}
+
+
+class _RestrictedUnpickler(pickle.Unpickler):
+    def find_class(self, module: str, name: str):
+        if (module, name) not in _SAFE_GLOBALS:
+            raise pickle.UnpicklingError(f"Blocked unsafe class: {module}.{name}")
+        return super().find_class(module, name)
+
+
+def _safe_pickle_load(data: bytes) -> object:
+    """Deserialize bytes using the restricted unpickler."""
+    return _RestrictedUnpickler(io.BytesIO(data)).load()
+
+
+def _verify_hmac(data: bytes, sig_path: Path) -> None:
+    """Verify HMAC-SHA256 signature of model data. Raises on failure."""
+    from ...core.config import settings
+
+    hmac_key = settings.MODEL_HMAC_KEY
+    if not hmac_key:
+        if settings.is_production:
+            raise RuntimeError(
+                "MODEL_HMAC_KEY must be set in production to verify ML model integrity."
+            )
+        logger.warning(
+            "MODEL_HMAC_KEY is not set; skipping model signature verification. "
+            "Set it in production to prevent model-tampering attacks."
+        )
+        return
+
+    if not sig_path.exists():
+        raise RuntimeError(
+            f"Model signature file {sig_path.name} not found. "
+            f"Generate it with: python -m app.features.phishing.phishing_ml --sign"
+        )
+
+    expected_sig = sig_path.read_text().strip()
+    actual_sig = hmac.new(
+        hmac_key.encode(), data, hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(actual_sig, expected_sig):
+        raise RuntimeError(
+            "Model HMAC signature mismatch — the model file may have been tampered with. "
+            "Re-sign the model after retraining."
+        )
 
 # Backwards-compatible aliases (older imports / scripts).
 TRANCO_TOP_LEGITIMATE_URLS = BENIGN_REFERENCE
@@ -91,8 +169,16 @@ def _load_bundle(path: Path = MODEL_PATH) -> dict:
     if not path.exists():
         return _fallback_bundle(f"{path.name} not found")
     try:
-        with open(path, "rb") as f:
-            obj = pickle.load(f)
+        raw = path.read_bytes()
+
+        # Step 1: Verify HMAC signature before touching the data.
+        sig_path = path.with_suffix(path.suffix + ".sig")
+        _verify_hmac(raw, sig_path)
+
+        # Step 2: Deserialize with restricted unpickler (defense-in-depth).
+        obj = _safe_pickle_load(raw)
+    except RuntimeError:
+        raise  # HMAC / production errors must not be silently swallowed
     except Exception as e:  # corrupt / incompatible pickle
         return _fallback_bundle(f"could not load {path.name}: {e}")
 
@@ -100,6 +186,15 @@ def _load_bundle(path: Path = MODEL_PATH) -> dict:
         return _fallback_bundle("legacy artifact without a feature schema")
     if list(obj.get("feature_names", [])) != list(FEATURE_NAMES):
         return _fallback_bundle("feature schema mismatch; retrain with train.py")
+
+    if path.resolve() == MODEL_PATH.resolve():
+        import json
+        try:
+            card = json.loads(path.with_name("model_card.json").read_text())["model"]
+            if card["version"] != obj.get("version") or card["feature_names"] != FEATURE_NAMES:
+                raise ValueError("model card does not match the artifact")
+        except (OSError, KeyError, ValueError) as exc:
+            return _fallback_bundle(str(exc))
 
     obj.setdefault("source", "artifact")
     logger.info("Loaded phishing model v%s (trained %s).", obj.get("version"), obj.get("trained_at"))
@@ -186,3 +281,28 @@ def predict_phishing_ml(url: str) -> dict:
         "ml_probability": round(prob, 4),
         "ml_reasons": reasons,
     }
+
+
+# ---------------------------------------------------------------------------
+# CLI: sign the model artifact
+# Usage:  cd server && python -m app.features.phishing.phishing_ml --sign
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    import sys
+
+    if "--sign" in sys.argv:
+        from ...core.config import settings
+
+        key = settings.MODEL_HMAC_KEY
+        if not key:
+            print("ERROR: Set MODEL_HMAC_KEY in .env before signing.", file=sys.stderr)
+            sys.exit(1)
+
+        data = MODEL_PATH.read_bytes()
+        sig = hmac.new(key.encode(), data, hashlib.sha256).hexdigest()
+        sig_path = MODEL_PATH.with_suffix(MODEL_PATH.suffix + ".sig")
+        sig_path.write_text(sig + "\n")
+        print(f"✅ Signed {MODEL_PATH.name} -> {sig_path.name}")
+        print(f"   HMAC-SHA256: {sig}")
+    else:
+        print("Usage: python -m app.features.phishing.phishing_ml --sign")
